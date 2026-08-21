@@ -58,6 +58,7 @@ public final class TickController {
     /** Injected in place of {@code game.update(ds, slowDown)} — updater thread. */
     public static void gameUpdate(GAME game, double ds, double slowDown) {
         MainThread.drain();
+        DevAuto.gameTick();
 
         if (!Multiplayer.active()) {
             game.update(ds, slowDown);
@@ -129,6 +130,9 @@ public final class TickController {
             }
         }
         timer++;
+        if (timer % 600 == 0)
+            MpLog.info("clock: timer=" + timer + "/" + tickUntil
+                    + " updateI=" + GAME.updateI() + " speed=" + speed);
     }
 
     /**

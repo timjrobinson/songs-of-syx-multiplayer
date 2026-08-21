@@ -19,6 +19,12 @@ public final class SyxAgent {
     public static void premain(String args, Instrumentation inst) {
         instrumentation = inst;
         inst.addTransformer(new MpTransformer(PatchTable.build()), true);
+        // The menu hook needs a handler before the game reaches the menu;
+        // DevAuto is safe to load here (no game classes in its class init).
+        SyncTemplates.registerAt(PatchTable.HOOK_MENU_UPDATE, (self, a) -> {
+            syxmp.client.DevAuto.menuTick();
+            return false;
+        });
         System.out.println("[SyxMP] agent installed");
     }
 
