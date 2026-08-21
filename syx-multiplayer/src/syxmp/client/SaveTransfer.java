@@ -32,6 +32,9 @@ public final class SaveTransfer {
     private static final Method SAVE = ReflectUtil.method(GameSaver.class, "save", FilePutter.class);
     private static final Field BUFFER = ReflectUtil.field(FilePutter.class, "buffer");
 
+    /** Test seam: replaces apply() when set (headless tests have no game to load into). */
+    public static java.util.function.Consumer<byte[]> applyOverride;
+
     private SaveTransfer() {
     }
 
@@ -97,6 +100,12 @@ public final class SaveTransfer {
      * CORE.setCurrentState on the next frame.
      */
     public static void apply(byte[] saveBytes, Runnable afterLoad) {
+        if (applyOverride != null) {
+            applyOverride.accept(saveBytes);
+            if (afterLoad != null)
+                afterLoad.run();
+            return;
+        }
         try {
             Path dir = Files.createTempDirectory("syxmp");
             Path file = dir.resolve("network.save");

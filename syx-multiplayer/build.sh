@@ -28,6 +28,12 @@ if [[ ! -f "$GAME_JAR" ]]; then
     exit 1
 fi
 
+ASM_JAR="$PROJ/tools/asm-9.7.1.jar"
+if [[ ! -f "$ASM_JAR" ]]; then
+    echo "error: ASM not found at $ASM_JAR" >&2
+    exit 1
+fi
+
 rm -rf "$CLASSES"
 mkdir -p "$CLASSES"
 
@@ -35,12 +41,15 @@ mapfile -t SOURCES < <(find "$ROOT/src" -name '*.java')
 echo "compiling ${#SOURCES[@]} sources..."
 "$JDK/bin/javac" \
     --release 17 \
-    -cp "$GAME_JAR" \
+    -cp "$GAME_JAR:$ASM_JAR" \
     -d "$CLASSES" \
     -Xlint:all,-serial,-this-escape \
     "${SOURCES[@]}"
 
-"$JDK/bin/jar" --create --file "$JAR" -C "$CLASSES" .
+# Bundle ASM into the mod jar (the agent needs it inside the game JVM)
+unzip -oq "$ASM_JAR" 'org/*' -d "$CLASSES"
+
+"$JDK/bin/jar" --create --file "$JAR" --manifest "$ROOT/mod/MANIFEST.MF" -C "$CLASSES" .
 echo "built $JAR"
 
 # Install into the game's mods folder

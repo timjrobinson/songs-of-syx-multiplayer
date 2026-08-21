@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+Premain-Class: syxmp.agent.SyxAgent
+Agent-Class: syxmp.agent.SyxAgent
+Can-Redefine-Classes: true
+Can-Retransform-Classes: true

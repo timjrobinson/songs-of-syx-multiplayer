@@ -5,7 +5,10 @@ import java.io.IOException;
 import script.SCRIPT;
 import snake2d.util.file.FileGetter;
 import snake2d.util.file.FilePutter;
+import syxmp.agent.AgentInstaller;
+import syxmp.agent.SyxAgent;
 import syxmp.client.ClientConnect;
+import syxmp.client.Hooks;
 import syxmp.client.HostUtil;
 import syxmp.client.Multiplayer;
 import syxmp.client.TickController;
@@ -52,6 +55,8 @@ public class SyxMultiplayer implements SCRIPT {
         if (!registered) {
             registered = true;
             SyxSync.registerAll();
+            Hooks.installAll();
+            MpLog.info("agent " + (SyxAgent.isActive() ? "active" : "NOT ACTIVE"));
         }
     }
 
@@ -62,7 +67,12 @@ public class SyxMultiplayer implements SCRIPT {
                 HostUtil.hostServer(user, new ServerSettings()));
         IDebugPanel.add("MP: join localhost", () ->
                 ClientConnect.connect("127.0.0.1", 30599, user + "2", ""));
+        IDebugPanel.add("MP: pause/resume", () -> {
+            if (Multiplayer.active())
+                syxmp.client.ClientCommands.requestPauseToggle();
+        });
         IDebugPanel.add("MP: status", () -> MpLog.info(status()));
+        IDebugPanel.add("MP: install agent", () -> MpLog.info(AgentInstaller.install()));
     }
 
     public static String status() {

@@ -31,6 +31,8 @@ public final class CommandExecutor {
                 case GLOBAL_TIME_SPEED -> {
                     double speed = data.readDouble();
                     TickController.speed = speed;
+                    if (speed != 0)
+                        TickController.prevNonZeroSpeed = speed;
                     MpLog.debug("speed set to " + speed + " at " + cmd.ticks);
                 }
                 case PAUSE_ALL -> TickController.speed = 0;

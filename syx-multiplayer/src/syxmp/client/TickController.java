@@ -31,6 +31,8 @@ public final class TickController {
 
     /** Synced game speed (Songs of Syx speeds: 0, 0.25, 1, 5, 25, 250). Changed only by commands. */
     public static double speed = 1.0;
+    /** Last non-zero speed, for pause toggling. */
+    public static double prevNonZeroSpeed = 1.0;
     /** Sub-step accumulator (RW's TimeToTickThrough). */
     public static float timeToTickThrough;
 
