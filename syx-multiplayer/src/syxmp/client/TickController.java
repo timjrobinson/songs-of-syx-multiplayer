@@ -65,6 +65,18 @@ public final class TickController {
             return;
         }
 
+        // Session exists but we're still connecting/handshaking: the local
+        // game keeps running vanilla until the world transfer starts.
+        MultiplayerSession session = Multiplayer.session;
+        if (session.connection == null
+                || session.connection.stateEnum() != syxmp.net.ConnectionStateEnum.CLIENT_PLAYING) {
+            game.update(ds, slowDown);
+            return;
+        }
+        // World blob received and loading: never tick the outgoing game.
+        if (Multiplayer.reloading)
+            return;
+
         long now = System.nanoTime();
         float frameMs = lastFrameNanos == 0 ? 16.7f
                 : Math.min(200f, (now - lastFrameNanos) / 1_000_000f);
