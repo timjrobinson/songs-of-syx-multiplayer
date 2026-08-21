@@ -24,6 +24,9 @@ public final class PatchTable {
     public static final int HOOK_TMP_PAUSE = 2;
     public static final int HOOK_UPDATE_ONCE = 3;
 
+    // Sync-method hooks (bound to SyncMethod handlers by SyxSync) start at 100.
+    public static final int HOOK_IMMIGRATION_ADMIT = 100;
+
     public record CallRedirect(
             String inClass,        // internal name, e.g. "view/main/VIEW"
             String inMethod,       // method name filter, null = all methods
@@ -59,6 +62,10 @@ public final class PatchTable {
         t.hooks.add(new EntryHook("game/GameSpeed", "togglePause", "()V", HOOK_TOGGLE_PAUSE));
         t.hooks.add(new EntryHook("game/GameSpeed", "tmpPause", "()V", HOOK_TMP_PAUSE));
         t.hooks.add(new EntryHook("game/GameSpeed", "updateOnce", "()V", HOOK_UPDATE_ONCE));
+
+        // Synced player verbs (see SyxSync.registerAll for the wire handlers).
+        t.hooks.add(new EntryHook("settlement/entry/Immigration", "admit",
+                "(Linit/race/Race;I)V", HOOK_IMMIGRATION_ADMIT));
 
         return t;
     }

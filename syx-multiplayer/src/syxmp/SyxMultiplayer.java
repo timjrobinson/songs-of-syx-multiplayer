@@ -99,6 +99,11 @@ public class SyxMultiplayer implements SCRIPT {
         }
 
         @Override
+        public void render(snake2d.Renderer r, float ds) {
+            syxmp.client.MpHud.render(r);
+        }
+
+        @Override
         public void save(FilePutter file) {
             file.i(SAVE_VERSION);
             file.d(TickController.speed);

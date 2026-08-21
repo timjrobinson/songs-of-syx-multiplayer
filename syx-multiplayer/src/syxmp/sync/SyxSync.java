@@ -1,5 +1,10 @@
 package syxmp.sync;
 
+import init.race.Race;
+import settlement.entry.Immigration;
+import settlement.main.SETT;
+import syxmp.agent.PatchTable;
+import syxmp.agent.SyncTemplates;
 import syxmp.util.MpLog;
 
 /**
@@ -22,7 +27,16 @@ public final class SyxSync {
 
         // --- Handlers append below this line, never above ---
 
+        bind(PatchTable.HOOK_IMMIGRATION_ADMIT,
+                Sync.method(Immigration.class, "admit", Race.class, int.class)
+                        .instance(() -> SETT.ENTRY().immi()));
+
         Sync.postInit();
         MpLog.info("SyxSync registered " + Sync.handlerCount() + " handlers");
+    }
+
+    /** Connect an agent entry hook to a sync handler: UI calls become commands. */
+    private static void bind(int hookId, SyncMethod method) {
+        SyncTemplates.registerAt(hookId, (self, args) -> Sync.trySync(method, self, args));
     }
 }

@@ -88,6 +88,12 @@ public final class ServerJoiningState extends MpConnectionState {
                 expecting = Packets.CLIENT_WORLD_REQUEST;
             }
             case CLIENT_WORLD_REQUEST -> {
+                if (server.settings.pauseOnJoin)
+                    server.commands.pauseAll();
+                // Fresh baseline so the joiner doesn't replay a long cmd log
+                if (server.settings.autoJoinPoint
+                        && !server.playerManager.playingPlayers().isEmpty())
+                    server.worldData.tryStartJoinPointCreation();
                 connection.changeState(ConnectionStateEnum.SERVER_LOADING,
                         new ServerLoadingState(server, player));
             }

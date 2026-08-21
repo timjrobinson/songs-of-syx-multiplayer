@@ -182,11 +182,15 @@ public final class HeadlessTest {
         waitFor(() -> conn.stateEnum() == ConnectionStateEnum.CLIENT_PLAYING
                 && !session.players.isEmpty(), 5000, "reached playing state + player list");
 
-        // Command round-trip: client sends, server stamps + echoes
+        // Command round-trip: client sends, server stamps + echoes.
+        // (pauseOnJoin means a PAUSE_ALL from the server may precede ours.)
         ClientCommands.requestSpeed(5.0);
-        waitFor(() -> !session.cmds.isEmpty(), 5000, "command echoed back");
-        syxmp.common.ScheduledCommand cmd = session.cmds.peek();
-        check(cmd.type == syxmp.common.CommandType.GLOBAL_TIME_SPEED, "command type");
+        waitFor(() -> session.cmds.stream()
+                .anyMatch(c -> c.type == syxmp.common.CommandType.GLOBAL_TIME_SPEED),
+                5000, "command echoed back");
+        syxmp.common.ScheduledCommand cmd = session.cmds.stream()
+                .filter(c -> c.type == syxmp.common.CommandType.GLOBAL_TIME_SPEED)
+                .findFirst().orElseThrow();
         check(cmd.playerId == session.playerId, "command stamped with our playerId");
         check(cmd.ticks >= 1234, "command scheduled at/after server clock: " + cmd.ticks);
 
