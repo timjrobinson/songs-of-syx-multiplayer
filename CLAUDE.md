@@ -7,6 +7,8 @@ desync detection. "Syncs and communicates in all the same ways, just syncs
 Songs of Syx data."
 
 **Deep reference docs (read these before touching the sync engine):**
+- `docs/HANDOFF.md` — **START HERE**: session handoff, verified results, how
+  to run the two-instance E2E test, machine-state changes, next steps
 - `docs/rimworld-mp-architecture.md` — the RW-MP blueprint being ported
 - `docs/sos-internals.md` — Songs of Syx internals survey: tick loop, save
   system, script runtime, player-verb map, stable IDs, determinism hazards
