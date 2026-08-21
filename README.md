@@ -51,12 +51,29 @@ This compiles the mod against `SongsOfSyx.jar` and installs it to
 `~/.local/share/songsofsyx/mods/SyxMultiplayer/` (Info file + `V71/script/SyxMultiplayer.jar`).
 Enable it in the game's launcher mod list.
 
+## How the port maps onto Songs of Syx
+
+- The mod jar is also a **Java agent** (`-javaagent`, added to the launcher's
+  `JVM_ARGS2` — the in-game "MP: install agent" button does it for you). The
+  agent is our Harmony: it rewrites the game's frame loop to hand tick control
+  to the mod, and injects interception guards at the entry of synced methods.
+- Songs of Syx turns out to be a *better* lockstep target than RimWorld: a
+  fixed 1/16s sim sub-step, one global seedable RNG (we reseed it per sub-step,
+  which makes UI/menu RNG consumption harmless), full shipped sources, index-
+  stable object IDs, and a save system we can run in memory for state transfer
+  and desync hashing.
+
 ## Status
 
-Early development. Current state: project scaffolding, serialization
-primitives, network framing, and the server core are in place; the lockstep
-tick controller and the player-action sync layer are being built against a
-completed architectural survey of both codebases.
+Core engine complete and headless-tested: relay server, join handshake with
+fragmented world transfer, command stamping and the tick-window interlock,
+bytecode transformer (verified against the real game classes), lockstep tick
+controller, save capture/apply, desync sync-opinions, game-speed syncing, and
+the first synced player verb (immigration). Not yet play-tested in the running
+game — that's the next milestone. See `CLAUDE.md` for the detailed roadmap and
+`docs/` for the architecture studies.
+
+Run the headless test suite with `syx-multiplayer/test.sh`.
 
 ## Reference targets
 

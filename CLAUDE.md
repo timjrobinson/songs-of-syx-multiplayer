@@ -6,6 +6,11 @@ lockstep, command sync, dumb-relay server, save-transfer joining, sync-opinion
 desync detection. "Syncs and communicates in all the same ways, just syncs
 Songs of Syx data."
 
+**Deep reference docs (read these before touching the sync engine):**
+- `docs/rimworld-mp-architecture.md` — the RW-MP blueprint being ported
+- `docs/sos-internals.md` — Songs of Syx internals survey: tick loop, save
+  system, script runtime, player-verb map, stable IDs, determinism hazards
+
 ## Environment
 
 - Game install: `/mnt/games/SteamLibrary/steamapps/common/Songs of Syx/`
@@ -200,33 +205,98 @@ Wire protocol (packets/commands) is mirrored in `syxmp.common.Packets` /
 `CommandType`. RW's LiteNetLib reliable-ordered UDP ≈ our TCP transport
 (+ in-memory LocalConnection for the host loop, like RW's host).
 
-## Port design decisions (so far)
+## Port design decisions (settled)
 
-- **Zero external dependencies** in the mod jar (plain JDK: sockets, deflate).
-  Exception under consideration: shaded ASM if/when bytecode interception is
-  needed (`-javaagent` via launcher `JVM_ARGS2`; the mod can edit
-  LauncherSettings.txt itself and prompt for restart).
-- Prefer seams that avoid instrumentation where practical (reflection,
-  wrapper CORE_STATE, the one free GameResource slot, script hooks); accept
-  instrumentation for the `VIEW.java:257` tick-control edge and player-verb
-  interception if the survey shows no better seam.
+- **The mod jar doubles as a `-javaagent`** (Premain-Class manifest, ASM 9.7.1
+  bundled unrelocated under `org/objectweb/asm`). The agent is the Harmony
+  equivalent: `MpTransformer` applies a declarative `PatchTable` at class load —
+  call redirects and SyncTemplates entry hooks (`if (general(id, this, args))
+  return default;`). Hook ids are premain-safe constants in PatchTable;
+  handlers attach at game init (`Hooks.installAll`, `SyxSync.bind`) and fall
+  through to vanilla when absent. `AgentInstaller` writes the -javaagent line
+  into the launcher's JVM_ARGS2 (debug-panel button; restart required).
+- **Tick model**: server Timer at nominal 60/s (`TickRate.TIMER_HZ`); each Timer
+  unit a client accumulates 1.0 tick-through and runs 1/16s sub-steps per
+  `timePerTick(speed)` (RW's ITickable math; SoS speeds 0/0.25/1/5/25/250).
+  The agent redirects VIEW.update's `game.update(ds, slowDown)` call to
+  `TickController.gameUpdate`; sub-steps go through the vanilla manual-tick
+  entry `GAME.update(double)`. GameSpeed is neutralized (speedSet/togglePause
+  → synced commands; tmpPause/updateOnce suppressed in MP).
+- **RNG discipline**: reseed `RND` per sub-step from (sessionSeed, updateI),
+  and per command. This absorbs ALL out-of-substep consumption (minimap,
+  menus, hover UI) — no push/pop needed, a big simplification vs RW. UI
+  callbacks that consume RND *and* mutate sim must become synced commands.
+- **State transfer**: the game's own save pipeline, run in memory via
+  reflection (`SaveTransfer.capture` → GameSaver.save(FilePutter) + buffer
+  field; .save-compatible bytes). Apply = temp file + `new GameLoader(path)
+  .set()`. Join points: every client captures at the same tick, host uploads;
+  the raw-buffer FNV hash doubles as a deep desync check (hash raw, not
+  deflated — zlib versions differ). Deviation from RW: non-joining clients
+  don't reload at join points (documented; revisit if cache drift shows up).
+- **Desync detection**: 30-tick `ClientSyncOpinion` windows; each sub-step and
+  command fingerprinted by one post-execution `RND.rInt()` draw (with
+  reseeding, that draw = f(seed, updateI, #draws consumed)). Host's opinion is
+  the reference; server relays; mismatch → CLIENT_DESYNCED → pause.
 - SoS has ONE settlement sim (no per-map async time) → no mapId on commands;
   RW's per-map machinery collapses to a single global tickable. Battles need a
-  dedicated design pass later.
-- Target: co-op (shared settlement) first, like early RW MP; one faction,
-  multiple cursors.
-- Java sources: package `syxmp.*`, compiled `--release 17`.
+  dedicated design pass (BattleThreads must become synchronous first).
+- Target: co-op (shared settlement) first, like early RW MP; one faction.
+- Sync registration order (SyxSync) and Packets/CommandType ordinals are wire
+  protocol — append only, bump `MpVersion.PROTOCOL` on change.
+- Java sources: package `syxmp.*`, compiled `--release 17`. Zero external
+  deps besides bundled ASM.
 
-## Code layout (syx-multiplayer/src/syxmp/)
+## Code layout (syx-multiplayer/)
 
-- `SyxMultiplayer.java` — SCRIPT entry point
-- `common/` — protocol: `Packets`, `CommandType`, `ScheduledCommand`, `MpDisconnectReason`
-- `net/` — `ByteReader`/`ByteWriter` (LE, RW-MP format), `ConnectionBase`
-  (framing/fragmentation), `MpConnectionState`, `ConnectionStateEnum`, transports
-- `server/` — dumb relay: `MultiplayerServer`, `CommandHandler`, `PlayerManager`,
-  `WorldData`, `FreezeManager`, `ActionQueue`
-- `client/` — (being built) session, tick controller, sync registry, join flow
-- `util/` — `MpLog`, `ReflectUtil`
+- `src/syxmp/SyxMultiplayer.java` — SCRIPT entry (forceInit; saves MP clock
+  state into game saves; debug-panel buttons: host/join/pause/status/install
+  agent; HUD render hook)
+- `src/syxmp/common/` — wire protocol: Packets, CommandType, ScheduledCommand,
+  TickRate, MpVersion, MpDisconnectReason
+- `src/syxmp/net/` — ByteReader/Writer, ConnectionBase (6-bit id + 2-bit
+  fragment header, 32MiB fragmented), MpConnectionState, TcpConnection
+  (length-prefixed frames), LocalConnection (host's in-memory pair)
+- `src/syxmp/server/` — the relay: MultiplayerServer (30Hz clock, stalls >90
+  behind, paces at slowest client), CommandHandler (tick stamping + sentCmds),
+  PlayerManager, WorldData (join points), FreezeManager, TcpServerTransport,
+  state/ (Joining → Loading → Playing)
+- `src/syxmp/client/` — Multiplayer (session root + shouldSync gate),
+  TickController (the lockstep loop), CommandExecutor, MultiplayerSession
+  (tickUntil/sentCmds interlock), MainThread, SaveTransfer, JoinPoints,
+  HostUtil, ClientConnect, ClientCommands, Hooks, MpHud, state/
+- `src/syxmp/sync/` — Sync (registry, syncId=index), SyncMethod,
+  SyncSerialization + SyxSerialization (SoS workers), SyxSync (the
+  registration table — the file that grows as verbs get synced)
+- `src/syxmp/agent/` — SyxAgent (premain), MpTransformer (ASM), PatchTable,
+  SyncTemplates, AgentInstaller
+- `src/syxmp/desync/` — ClientSyncOpinion, SyncCoordinator
+- `test/HeadlessTest.java` + `test.sh` — no-game validation: transformer
+  against real game classes (hooked method skips body), full TCP join
+  handshake + fragmented world transfer + command round-trip against a live
+  server. Run `./test.sh` after every change.
+
+## Current status & roadmap
+
+Working (headless-verified): protocol, framing/fragmentation, relay server,
+join handshake, world transfer, command stamping/echo, tick-window interlock,
+bytecode transformer, GameSpeed hooks, first synced verb (Immigration.admit).
+
+NOT yet verified in the running game (next session should start here):
+1. Launch the game with the mod + agent (use `MP: install agent`, restart),
+   confirm VIEW.update patch fires and SP still works with agent active.
+2. Host + join on localhost with two instances (second instance needs its own
+   user data dir — game uses one settings/save dir per OS user).
+3. Two-client determinism soak: same actions, watch sync opinions.
+4. Then grow SyxSync verb coverage in the priority order of
+   docs/sos-internals.md §Player verbs (tools → INTE settings → one-offs),
+   and knock down the determinism hazard list (pathfinder sync branch,
+   view-gated sim, battle threads).
+5. UI: join-from-menu, proper chat window, player cursors, desync dialog.
+
+Known v1 limitations (documented deviations): joiner must be in a running
+game; battles unsupported (battle view gates sim resources locally); no
+mid-game reload normalization at join points for existing clients; autosave
+should be disabled manually in MP.
 
 ## Working agreements
 
@@ -234,3 +304,4 @@ Wire protocol (packets/commands) is mirrored in `syxmp.common.Packets` /
 - reference/ and tools/ stay out of git.
 - When behavior of a game class matters, cite `file.java:line` from
   `reference/syx-sources` in comments/docs — the sources are version-exact.
+- Run `syx-multiplayer/test.sh` before every commit.
