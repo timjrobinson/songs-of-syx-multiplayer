@@ -1,0 +1,15 @@
+# Reference material — regenerable, not ours to version
+# reference/Multiplayer: git clone of https://github.com/rwmt/Multiplayer
+# reference/syx-sources: unzip of the game's SongsOfSyx-sources.jar
+reference/
+
+# Local toolchain (Temurin JDK download)
+tools/
+
+# Build output
+syx-multiplayer/out/
+
+# Editor noise
+*.swp
+.idea/
+.vscode/

@@ -1,0 +1,5 @@
+VERSION: "0.1",
+NAME: "Syx Multiplayer",
+DESC: "Co-op multiplayer for Songs of Syx. Deterministic lockstep sync of the simulation, modeled on the RimWorld Multiplayer mod architecture.",
+AUTHOR: "Tim Robinson",
+INFO: "https://github.com/timjrobinson",
