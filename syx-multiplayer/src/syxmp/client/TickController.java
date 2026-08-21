@@ -112,6 +112,7 @@ public final class TickController {
     /** One Timer unit: due commands, then as many sub-steps as the speed calls for. */
     private static void runOneTimerUnit() {
         MultiplayerSession session = Multiplayer.session;
+        syxmp.desync.SyncCoordinator.onTimerUnit(timer);
         while (!session.cmds.isEmpty() && session.cmds.peek().ticks <= timer) {
             ScheduledCommand cmd = session.cmds.poll();
             if (cmd.ticks < timer)
@@ -145,6 +146,9 @@ public final class TickController {
             // GAME.update(double) is the vanilla manual-tick entry
             // (GAME.java:235: SPEED.speedSet(1.0); game.update(seconds, 0)).
             GAME.update(TickRate.SUBSTEP_DS);
+            // One post-step draw fingerprints (seed, updateI, draws consumed):
+            // it diverges as soon as any client's sim used the RNG differently.
+            syxmp.desync.SyncCoordinator.recordSubStep(RND.rInt());
         } finally {
             Multiplayer.ticking = false;
         }

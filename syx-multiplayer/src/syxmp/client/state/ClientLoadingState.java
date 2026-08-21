@@ -53,6 +53,7 @@ public final class ClientLoadingState extends MpConnectionState {
 
                 TickController.setClock(savedGameTimer, tickUntil);
                 TickController.frozen = frozen;
+                syxmp.desync.SyncCoordinator.reset();
                 TickController.simulatingTarget = tickUntil;
                 TickController.onSimulatingDone = () -> {
                     connection.send(Packets.CLIENT_WORLD_READY);

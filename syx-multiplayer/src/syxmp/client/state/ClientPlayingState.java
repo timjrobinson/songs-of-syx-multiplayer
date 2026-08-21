@@ -63,10 +63,8 @@ public final class ClientPlayingState extends MpConnectionState {
                     session.players.add(e);
                 }
             }
-            case SERVER_SYNC_INFO -> {
-                // Desync-detection opinions; handled once SyncCoordinator lands
-                data.readRemaining();
-            }
+            case SERVER_SYNC_INFO -> syxmp.desync.SyncCoordinator.addRemoteOpinion(
+                    syxmp.desync.ClientSyncOpinion.deserialize(data));
             case SERVER_CURSOR -> {
                 // Other players' cursors; UI overlay not implemented yet
                 data.readRemaining();

@@ -44,6 +44,7 @@ public final class HostUtil {
         Multiplayer.session = session;
         TickController.setClock(0, 0);
         TickController.speed = 0; // start paused; unpausing is a synced command
+        syxmp.desync.SyncCoordinator.reset();
 
         SaveTransfer.Capture capture;
         try {

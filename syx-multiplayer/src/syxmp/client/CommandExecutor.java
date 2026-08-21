@@ -45,6 +45,7 @@ public final class CommandExecutor {
                     // Not implemented yet
                 }
             }
+            syxmp.desync.SyncCoordinator.recordCommand(RND.rInt());
         } catch (Exception e) {
             MpLog.err("error executing " + cmd, e);
             GAME.Notify("SyxMP: error executing command " + cmd.type);
