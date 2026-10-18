@@ -77,7 +77,7 @@ public final class TickController {
         DevAuto.gameTick();
 
         if (!Multiplayer.active()) {
-            game.update(ds, slowDown);
+            vanillaUpdate(game, ds, slowDown);
             return;
         }
 
@@ -86,7 +86,7 @@ public final class TickController {
         MultiplayerSession session = Multiplayer.session;
         if (session.connection == null
                 || session.connection.stateEnum() != syxmp.net.ConnectionStateEnum.CLIENT_PLAYING) {
-            game.update(ds, slowDown);
+            vanillaUpdate(game, ds, slowDown);
             return;
         }
         // World blob received and loading: never tick the outgoing game.
@@ -145,6 +145,21 @@ public final class TickController {
     }
 
     private static GAME currentGame;
+
+    /**
+     * Vanilla frame update while no lockstep session owns the sim. Marked as
+     * ticking so the sync hooks never mistake the game's own internal setter
+     * calls for player input (they would be cancelled locally and sent as
+     * commands — seen while a client was reconnecting).
+     */
+    private static void vanillaUpdate(GAME game, double ds, double slowDown) {
+        Multiplayer.ticking = true;
+        try {
+            game.update(ds, slowDown);
+        } finally {
+            Multiplayer.ticking = false;
+        }
+    }
 
     /** True once the lockstep loop owns the simulation (connection playing, not reloading). */
     public static boolean inLockstep() {

@@ -166,6 +166,12 @@ public final class MpPanel extends InterGui {
         MultiplayerSession session = Multiplayer.session;
         if (msg.isEmpty() || session == null || session.connection == null)
             return;
+        if (msg.equalsIgnoreCase("/paths")) {
+            syxmp.sync.ObjectPaths.invalidate();
+            syxmp.sync.ObjectPaths.pathOf(new Object()); // forces a rebuild + stats log
+            ClientPlayingState.ChatLog.add("*", "object path index rebuilt (see log)");
+            return;
+        }
         if (msg.equalsIgnoreCase("/hash")) {
             ByteWriter w = new ByteWriter(1);
             w.writeByte(0);

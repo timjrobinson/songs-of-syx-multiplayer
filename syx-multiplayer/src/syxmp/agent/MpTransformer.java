@@ -37,7 +37,15 @@ public final class MpTransformer implements ClassFileTransformer {
             return null;
         try {
             ClassReader reader = new ClassReader(bytes);
-            ClassWriter writer = new SafeClassWriter(reader, ClassWriter.COMPUTE_FRAMES);
+            // Call redirects keep the stack shape (same args, receiver becomes
+            // the first static arg), so existing frames stay valid; only
+            // entry hooks add a branch and need recomputed frames.
+            boolean needsFrames = false;
+            for (PatchTable.EntryHook h : table.hooks)
+                if (h.owner().equals(className))
+                    needsFrames = true;
+            ClassWriter writer = new SafeClassWriter(reader,
+                    needsFrames ? ClassWriter.COMPUTE_FRAMES : ClassWriter.COMPUTE_MAXS);
             reader.accept(new PatchingVisitor(writer, className), 0);
             System.out.println("[SyxMP] patched " + className);
             return writer.toByteArray();
@@ -48,7 +56,12 @@ public final class MpTransformer implements ClassFileTransformer {
         }
     }
 
-    /** Resolves the common-superclass question without initializing classes. */
+    /**
+     * Resolves the common-superclass question by reading class files from
+     * the class path, never by loading classes: loading from inside a
+     * transformer can define the class being transformed (LinkageError
+     * "duplicate class definition", seen with UI classes).
+     */
     private static final class SafeClassWriter extends ClassWriter {
         SafeClassWriter(ClassReader reader, int flags) {
             super(reader, flags);
@@ -57,23 +70,37 @@ public final class MpTransformer implements ClassFileTransformer {
         @Override
         protected String getCommonSuperClass(String type1, String type2) {
             try {
-                Class<?> c1 = Class.forName(type1.replace('/', '.'), false,
-                        ClassLoader.getSystemClassLoader());
-                Class<?> c2 = Class.forName(type2.replace('/', '.'), false,
-                        ClassLoader.getSystemClassLoader());
-                if (c1.isAssignableFrom(c2))
-                    return type1;
-                if (c2.isAssignableFrom(c1))
-                    return type2;
-                if (c1.isInterface() || c2.isInterface())
+                List<String> chain1 = superChain(type1);
+                List<String> chain2 = superChain(type2);
+                if (chain1 == null || chain2 == null)
                     return "java/lang/Object";
-                do {
-                    c1 = c1.getSuperclass();
-                } while (!c1.isAssignableFrom(c2));
-                return c1.getName().replace('.', '/');
+                for (String s : chain1)
+                    if (chain2.contains(s))
+                        return s;
+                return "java/lang/Object";
             } catch (Throwable t) {
                 return "java/lang/Object";
             }
+        }
+
+        /** type, its superclass, ... , java/lang/Object; null for interfaces/unreadable. */
+        private static List<String> superChain(String type) throws java.io.IOException {
+            List<String> chain = new ArrayList<>();
+            String cur = type;
+            while (cur != null) {
+                chain.add(cur);
+                if (cur.equals("java/lang/Object"))
+                    break;
+                try (java.io.InputStream in = ClassLoader.getSystemResourceAsStream(cur + ".class")) {
+                    if (in == null)
+                        return null;
+                    ClassReader r = new ClassReader(in);
+                    if ((r.getAccess() & Opcodes.ACC_INTERFACE) != 0)
+                        return null;
+                    cur = r.getSuperName();
+                }
+            }
+            return chain;
         }
     }
 

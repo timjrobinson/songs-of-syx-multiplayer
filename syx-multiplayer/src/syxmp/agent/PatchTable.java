@@ -193,6 +193,10 @@ public final class PatchTable {
         // Whole visual layers: sprite composition at load, UI, rendering, menus.
         "util/spritecomposer/*", "init/sprite/*", "util/rendering/*", "snake2d/util/light/*",
         "util/gui/*", "menu/*", "view/*",
+        // Render helpers constructed lazily (first game in the process only)
+        // and sprite classes: e.g. settlement.battle.BannerRenderer draws 4
+        // times in its constructor — only on the client whose first game it is.
+        "*Renderer*", "*Sprite*", "*Particle*", "*Anim*",
     };
 
     private static final String[][] RND_METHODS = {
@@ -211,6 +215,8 @@ public final class PatchTable {
     }
 
     static boolean classMatches(String pattern, String internalClassName) {
+        if (pattern.startsWith("*") && pattern.endsWith("*"))
+            return internalClassName.contains(pattern.substring(1, pattern.length() - 1));
         if (pattern.endsWith("*"))
             return internalClassName.startsWith(pattern.substring(0, pattern.length() - 1));
         return pattern.equals(internalClassName);

@@ -25,9 +25,11 @@ public final class Determinism {
         if (Multiplayer.active() && TickController.inLockstep())
             return;
         syxmp.dev.VerbTrace.uiContext = false;
+        Multiplayer.ticking = true;
         try {
             game.afterTick();
         } finally {
+            Multiplayer.ticking = false;
             syxmp.dev.VerbTrace.uiContext = true;
         }
     }
