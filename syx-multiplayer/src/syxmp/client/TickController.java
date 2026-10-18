@@ -245,7 +245,8 @@ public final class TickController {
         int seed = mixSeed(session.rngSeed ^ 0x6C0AD5EEDL, timer);
         syxmp.dev.RndTrace.beginLoad(timer);
         RND.setSeed(seed);
-        MpLog.info("seeded RND for load at timer " + timer);
+        MpLog.info("seeded RND for load at timer " + timer + " seed=" + Integer.toHexString(seed)
+                + " session=" + Long.toHexString(session.rngSeed));
     }
 
     /** Second deterministic seed: after GAME+VIEW construction, before the save data loads. */
@@ -253,9 +254,11 @@ public final class TickController {
         MultiplayerSession session = Multiplayer.session;
         if (session == null || !Multiplayer.reloading)
             return;
-        RND.setSeed(mixSeed(session.rngSeed ^ 0x4F7E12C3L, timer));
+        int seed = mixSeed(session.rngSeed ^ 0x4F7E12C3L, timer);
+        RND.setSeed(seed);
         syxmp.dev.RndTrace.mark("## after-create reseed");
-        MpLog.info("reseeded RND after game creation at timer " + timer);
+        MpLog.info("reseeded RND after game creation at timer " + timer + " seed=" + Integer.toHexString(seed)
+                + " session=" + Long.toHexString(session.rngSeed) + " probe2=" + Integer.toHexString(RND.rInt()));
     }
 
     public static int mixSeed(long sessionSeed, int tick) {

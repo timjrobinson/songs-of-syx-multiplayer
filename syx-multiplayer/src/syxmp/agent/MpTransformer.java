@@ -33,7 +33,11 @@ public final class MpTransformer implements ClassFileTransformer {
     @Override
     public byte[] transform(ClassLoader loader, String className, Class<?> being,
             ProtectionDomain pd, byte[] bytes) {
-        if (className == null || !table.touches(className))
+        if (className == null || className.startsWith("syxmp/") || className.startsWith("java/")
+                || className.startsWith("org/objectweb/"))
+            return null;
+        boolean clinitRule = !className.startsWith("snake2d/util/rnd/") && !className.startsWith("com/codedisaster/");
+        if (!clinitRule && !table.touches(className))
             return null;
         try {
             ClassReader reader = new ClassReader(bytes);
@@ -46,8 +50,12 @@ public final class MpTransformer implements ClassFileTransformer {
                     needsFrames = true;
             ClassWriter writer = new SafeClassWriter(reader,
                     needsFrames ? ClassWriter.COMPUTE_FRAMES : ClassWriter.COMPUTE_MAXS);
-            reader.accept(new PatchingVisitor(writer, className), 0);
-            System.out.println("[SyxMP] patched " + className);
+            PatchingVisitor pv = new PatchingVisitor(writer, className, clinitRule);
+            reader.accept(pv, 0);
+            if (!pv.changed)
+                return null;
+            if (pv.changedBeyondClinit)
+                System.out.println("[SyxMP] patched " + className);
             return writer.toByteArray();
         } catch (Throwable t) {
             System.err.println("[SyxMP] failed to patch " + className + ": " + t);
@@ -106,10 +114,14 @@ public final class MpTransformer implements ClassFileTransformer {
 
     private final class PatchingVisitor extends ClassVisitor {
         private final String className;
+        private final boolean clinitRule;
+        boolean changed;
+        boolean changedBeyondClinit;
 
-        PatchingVisitor(ClassVisitor cv, String className) {
+        PatchingVisitor(ClassVisitor cv, String className, boolean clinitRule) {
             super(Opcodes.ASM9, cv);
             this.className = className;
+            this.clinitRule = clinitRule;
         }
 
         @Override
@@ -117,30 +129,59 @@ public final class MpTransformer implements ClassFileTransformer {
                 String signature, String[] exceptions) {
             MethodVisitor mv = super.visitMethod(access, name, desc, signature, exceptions);
 
+            // Static initializers: RND.* -> ClinitRnd.* (per-class deterministic stream).
+            if (clinitRule && name.equals("<clinit>"))
+                mv = new ClinitRndVisitor(mv, this);
+
             List<PatchTable.CallRedirect> redirects = new ArrayList<>();
             for (PatchTable.CallRedirect r : table.redirects)
                 if (PatchTable.classMatches(r.inClass(), className)
                         && (r.inMethod() == null || r.inMethod().equals(name)))
                     redirects.add(r);
             if (!redirects.isEmpty())
-                mv = new RedirectingMethodVisitor(mv, redirects);
+                mv = new RedirectingMethodVisitor(mv, redirects, this);
 
             for (PatchTable.EntryHook h : table.hooks)
                 if (h.owner().equals(className) && h.name().equals(name) && h.desc().equals(desc)) {
                     boolean isStatic = (access & Opcodes.ACC_STATIC) != 0;
                     mv = new EntryHookMethodVisitor(mv, h.hookId(), isStatic, desc);
+                    changed = true;
+                    changedBeyondClinit = true;
                 }
             return mv;
+        }
+    }
+
+    /** Inside <clinit>: every RND draw goes to ClinitRnd (same name and descriptor). */
+    private static final class ClinitRndVisitor extends MethodVisitor {
+        private final PatchingVisitor owner;
+
+        ClinitRndVisitor(MethodVisitor mv, PatchingVisitor owner) {
+            super(Opcodes.ASM9, mv);
+            this.owner = owner;
+        }
+
+        @Override
+        public void visitMethodInsn(int opcode, String o, String name, String desc, boolean itf) {
+            if (opcode == Opcodes.INVOKESTATIC && o.equals("snake2d/util/rnd/RND")
+                    && !name.equals("seed") && !name.equals("setSeed")) {
+                owner.changed = true;
+                super.visitMethodInsn(Opcodes.INVOKESTATIC, "syxmp/client/ClinitRnd", name, desc, false);
+                return;
+            }
+            super.visitMethodInsn(opcode, o, name, desc, itf);
         }
     }
 
     /** Rewrites matching virtual calls into static calls with the receiver prepended. */
     private static final class RedirectingMethodVisitor extends MethodVisitor {
         private final List<PatchTable.CallRedirect> redirects;
+        private final PatchingVisitor pv;
 
-        RedirectingMethodVisitor(MethodVisitor mv, List<PatchTable.CallRedirect> redirects) {
+        RedirectingMethodVisitor(MethodVisitor mv, List<PatchTable.CallRedirect> redirects, PatchingVisitor pv) {
             super(Opcodes.ASM9, mv);
             this.redirects = redirects;
+            this.pv = pv;
         }
 
         @Override
@@ -151,6 +192,8 @@ public final class MpTransformer implements ClassFileTransformer {
                     continue;
                 if (!(r.targetName().equals("*") || name.equals(r.targetName())))
                     continue;
+                pv.changed = true;
+                pv.changedBeyondClinit = true;
                 if (opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKEINTERFACE) {
                     String newDesc = "(L" + r.targetOwner() + ";" + desc.substring(1);
                     super.visitMethodInsn(Opcodes.INVOKESTATIC, r.newOwner(), r.newName(),

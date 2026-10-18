@@ -94,6 +94,7 @@ public final class RndTrace {
             Files.createDirectories(dir);
             out = Files.newBufferedWriter(dir.resolve("syxmp-rnd.txt"), StandardCharsets.UTF_8);
             out.write("## load timer=" + timer + "\n");
+            drawsInStep = 0;
             loadPhase = true;
         } catch (IOException e) {
             done = true;

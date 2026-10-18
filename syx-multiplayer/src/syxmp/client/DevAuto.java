@@ -72,13 +72,16 @@ public final class DevAuto {
             }
         }
 
-        if (AUTOUNPAUSE != null && !unpausedForTwo && Multiplayer.active()
-                && Multiplayer.session.isHost && Multiplayer.session.players.size() >= 2) {
-            if (++framesWithTwo == 300) {
-                unpausedForTwo = true;
+        if (AUTOUNPAUSE != null && Multiplayer.active() && Multiplayer.session.isHost
+                && Multiplayer.session.players.size() >= 2 && TickController.speed == 0
+                && TickController.inLockstep()) {
+            if (++framesWithTwo >= 300) {
+                framesWithTwo = 0;
                 MpLog.info("[auto] second player present: speed 1");
                 ClientCommands.requestSpeed(1.0);
             }
+        } else {
+            framesWithTwo = 0;
         }
 
         if (AUTOJOIN != null && !joined) {
