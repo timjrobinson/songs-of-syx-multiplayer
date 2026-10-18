@@ -74,6 +74,36 @@ public final class ToolSync {
         }
     }
 
+    /** Dev/test: designate a filled rectangle with an area placer through the synced path. */
+    public static void devPlaceMulti(PlacableMulti p, int x1, int y1, int w, int h) {
+        BitSet bits = new BitSet(w * h);
+        bits.set(0, w * h);
+        SyncArea area = new SyncArea(x1, y1, w, h, bits);
+        PLACER_TYPE type = PLACER_TYPE.SQUARE;
+        if (Multiplayer.shouldSync()) {
+            String path = ObjectPaths.pathOf(p);
+            if (path != null) {
+                ByteWriter wr = new ByteWriter(256);
+                wr.writeByte(MULTI);
+                wr.writeString(path);
+                wr.writeByte(typeIndex(type));
+                wr.writeBool(Job.overwrite);
+                writeArea(wr, area);
+                send(wr);
+                return;
+            }
+            unsynced(p);
+        }
+        p.finishChecking(area);
+        if (p.isPlacable(area, type) != null)
+            return;
+        for (int y = y1; y < y1 + h; y++)
+            for (int x = x1; x < x1 + w; x++)
+                if (p.isPlacable(x, y, area, type) == null)
+                    p.place(x, y, area, type);
+        p.finishPlacing(area);
+    }
+
     public static void placeSimple(PlacableSimple p, int x, int y) {
         if (!trySend(SIMPLE, p, x, y, 0, 0))
             p.place(x, y);
