@@ -114,7 +114,7 @@ public final class SyncCoordinator {
         } catch (RuntimeException e) {
             // no game
         }
-        if (!Multiplayer.session.isHost) {
+        if (!Multiplayer.session.isHost && !"1".equals(System.getProperty("syxmp.noresync"))) {
             // Rejoin on a later frame, outside the tick that detected it.
             syxmp.client.MainThread.enqueue(() -> syxmp.client.ClientConnect.resync("desync at " + atTimer));
         }
