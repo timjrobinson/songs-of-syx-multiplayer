@@ -21,7 +21,7 @@ public final class MpHud {
     }
 
     /** Screen rectangle of the status line; clicking it opens the panel. */
-    public static final int X1 = 24, Y1 = 4, Y2 = 28;
+    public static final int X1 = 24, Y1 = 52, Y2 = 76;
     public static int x2 = 24;
 
     public static void render(Renderer r) {
