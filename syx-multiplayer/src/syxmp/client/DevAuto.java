@@ -33,6 +33,8 @@ public final class DevAuto {
     private static int actFrames;
     private static int actIndex;
     private static int createAtFrame = -1;
+    private static int areaAtFrame = -1;
+    private static int stockpileStep;
 
     private static int menuFrames;
     private static int gameFrames;
@@ -48,23 +50,10 @@ public final class DevAuto {
                 // Build a 4x4 stockpile: stage blueprint (AutoSync), area (TOOL), commit (AutoSync).
                 settlement.room.main.placement.RoomPlacer placer = settlement.main.SETT.ROOMS().placement.placer;
                 settlement.room.main.RoomBlueprintImp blue = settlement.main.SETT.ROOMS().STOCKPILE;
-                placer.init(blue, 0);
-                view.tool.PlacableMulti area = (view.tool.PlacableMulti) placer.area();
-                int cx = settlement.main.SETT.TWIDTH / 2, cy = settlement.main.SETT.THEIGHT / 2;
-                for (int r = 6 + (i / 4) * 5; r < cx - 6; r += 4) {
-                    int x = cx - r, y = cy - (i % 5) * 4;
-                    boolean ok = true;
-                    for (int dy = 0; dy < 4 && ok; dy++)
-                        for (int dx = 0; dx < 4 && ok; dx++)
-                            ok = area.isPlacable(x + dx, y + dy, syxmp.sync.ToolSync.rect(x, y, 4, 4), view.tool.PLACER_TYPE.SQUARE) == null;
-                    if (ok) {
-                        MpLog.info("[auto] action: stockpile at " + x + "," + y);
-                        syxmp.sync.ToolSync.devPlaceMulti(area, x, y, 4, 4);
-                        createAtFrame = gameFrames + 120; // after the TOOL command has executed locally
-                        return;
-                    }
-                }
-                MpLog.info("[auto] action: no spot for stockpile");
+                MpLog.info("[auto] action: stage stockpile blueprint");
+                placer.init(blue, 0); // synced command; applied on every client at its tick
+                stockpileStep = i;
+                areaAtFrame = gameFrames + 90;
             }
             case 0 -> {
                 int n = 1 + (i / 3) % 5;
@@ -77,7 +66,7 @@ public final class DevAuto {
                 int cx = settlement.main.SETT.TWIDTH / 2, cy = settlement.main.SETT.THEIGHT / 2;
                 for (int r = 2 + (i / 3) * 3; r < cx - 4; r += 3) {
                     int x = cx + r, y = cy + (i % 7) * 2;
-                    if (p.isPlacable(x, y, syxmp.sync.ToolSync.rect(x, y, 3, 3), view.tool.PLACER_TYPE.SQUARE) == null) {
+                    if (p.isPlacable(x, y, null, view.tool.PLACER_TYPE.SQUARE) == null) {
                         MpLog.info("[auto] action: clear job at " + x + "," + y);
                         syxmp.sync.ToolSync.devPlaceMulti(p, x, y, 3, 3);
                         return;
@@ -152,6 +141,29 @@ public final class DevAuto {
             framesWithTwo = 0;
         }
 
+        if (areaAtFrame > 0 && gameFrames >= areaAtFrame) {
+            areaAtFrame = -1;
+            settlement.room.main.placement.RoomPlacer placer = settlement.main.SETT.ROOMS().placement.placer;
+            view.tool.PlacableMulti area = (view.tool.PlacableMulti) placer.area();
+            int cx = settlement.main.SETT.TWIDTH / 2, cy = settlement.main.SETT.THEIGHT / 2;
+            boolean placed = false;
+            for (int r = 6 + (stockpileStep / 4) * 5; r < cx - 6 && !placed; r += 4) {
+                int x = cx - r, y = cy - (stockpileStep % 5) * 4;
+                boolean ok = true;
+                for (int dy = 0; dy < 4 && ok; dy++)
+                    for (int dx = 0; dx < 4 && ok; dx++)
+                        ok = area.isPlacable(x + dx, y + dy, syxmp.sync.ToolSync.rect(x, y, 4, 4), view.tool.PLACER_TYPE.SQUARE) == null;
+                if (ok) {
+                    MpLog.info("[auto] action: stockpile area at " + x + "," + y);
+                    syxmp.sync.ToolSync.devPlaceMulti(area, x, y, 4, 4);
+                    createAtFrame = gameFrames + 120;
+                    placed = true;
+                }
+            }
+            if (!placed)
+                MpLog.info("[auto] action: no spot for stockpile");
+        }
+
         if (createAtFrame > 0 && gameFrames >= createAtFrame) {
             createAtFrame = -1;
             settlement.room.main.placement.RoomPlacer placer = settlement.main.SETT.ROOMS().placement.placer;
@@ -166,7 +178,7 @@ public final class DevAuto {
         if (AUTOACT != null && Multiplayer.active() && Multiplayer.session.isHost
                 && TickController.inLockstep() && TickController.speed > 0
                 && Multiplayer.session.players.size() >= 2) {
-            if (++actFrames >= 1200) {
+            if (++actFrames >= 600) {
                 actFrames = 0;
                 try {
                     act(actIndex++);
