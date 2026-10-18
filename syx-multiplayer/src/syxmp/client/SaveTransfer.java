@@ -35,6 +35,33 @@ public final class SaveTransfer {
     /** Test seam: replaces apply() when set (headless tests have no game to load into). */
     public static java.util.function.Consumer<byte[]> applyOverride;
 
+    /** Set by the script when a fresh SCRIPT_INSTANCE is created for a new GAME. */
+    public static volatile boolean newGameCreated;
+    private static Runnable pendingAfterLoad;
+
+    /**
+     * Called on the first frame of every game update while reloading: once
+     * the new GAME exists (its script instance has been created), the
+     * network load is complete — dismiss the "click to continue" screen and
+     * run the continuation.
+     */
+    public static void finishReloadIfPending() {
+        if (!Multiplayer.reloading || !newGameCreated)
+            return;
+        Multiplayer.reloading = false;
+        newGameCreated = false;
+        try {
+            view.main.VIEW.inters().load.deactivate();
+        } catch (RuntimeException e) {
+            MpLog.err("could not dismiss load screen", e);
+        }
+        Runnable r = pendingAfterLoad;
+        pendingAfterLoad = null;
+        MpLog.info("received state loaded; game recreated");
+        if (r != null)
+            r.run();
+    }
+
     private SaveTransfer() {
     }
 
@@ -110,12 +137,13 @@ public final class SaveTransfer {
             Path dir = Files.createTempDirectory("syxmp");
             Path file = dir.resolve("network.save");
             Files.write(file, saveBytes);
+            // GameLoader recreates GAME (and its GameSaver), so a callback
+            // registered on the current saver would never fire. The new
+            // game's first frame completes the reload instead (see
+            // finishReloadIfPending, called from TickController.gameUpdate).
             Multiplayer.reloading = true;
-            GAME.saver().onAfterLoad(p -> {
-                Multiplayer.reloading = false;
-                if (afterLoad != null)
-                    afterLoad.run();
-            });
+            pendingAfterLoad = afterLoad == null ? () -> { } : afterLoad;
+            newGameCreated = false;
             new GameLoader(file).set();
             MpLog.info("loading received state (" + saveBytes.length + "b)");
         } catch (Exception e) {

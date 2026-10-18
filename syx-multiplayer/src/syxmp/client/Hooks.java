@@ -54,6 +54,12 @@ public final class Hooks {
         SyncTemplates.registerAt(PatchTable.HOOK_TMP_PAUSE, suppressInMp);
         SyncTemplates.registerAt(PatchTable.HOOK_UPDATE_ONCE, suppressInMp);
 
+        // Leaving to the main menu ends the session (host: stops the server).
+        SyncTemplates.registerAt(PatchTable.HOOK_EXIT_TO_MENU, (self, args) -> {
+            ClientConnect.disconnect("left to main menu");
+            return false;
+        });
+
         MpLog.info("entry hooks installed");
     }
 }

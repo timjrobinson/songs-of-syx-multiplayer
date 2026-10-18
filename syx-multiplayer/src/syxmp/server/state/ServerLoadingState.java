@@ -55,12 +55,32 @@ public final class ServerLoadingState extends MpConnectionState {
 
     @Override
     public boolean handle(Packets packet, ByteReader data) {
-        if (packet == Packets.CLIENT_WORLD_READY) {
-            connection.changeState(ConnectionStateEnum.SERVER_PLAYING,
-                    new ServerPlayingState(server, player));
-            server.playerManager.onPlaying(player);
-            return true;
+        switch (packet) {
+            case CLIENT_WORLD_READY -> {
+                connection.changeState(ConnectionStateEnum.SERVER_PLAYING,
+                        new ServerPlayingState(server, player));
+                server.playerManager.onPlaying(player);
+            }
+            // The client enters its playing state as soon as the world blob
+            // arrives (its clock runs during catch-up), so these can show up
+            // before WORLD_READY — they must not be fatal (live-test finding).
+            case CLIENT_KEEP_ALIVE -> {
+                int id = data.readInt();
+                ByteWriter w = new ByteWriter(4);
+                w.writeInt(id);
+                connection.send(Packets.SERVER_KEEP_ALIVE, w);
+                player.lastKeepAliveMs = System.currentTimeMillis();
+            }
+            case CLIENT_FRAME_TIME -> {
+                player.frameTimeMs = data.readFloat();
+                player.lastReportedTimer = data.readInt();
+                player.lastReportAtTimer = server.gameTimer();
+            }
+            case CLIENT_SYNC_INFO, CLIENT_CURSOR -> data.readRemaining();
+            default -> {
+                return false;
+            }
         }
-        return false;
+        return true;
     }
 }

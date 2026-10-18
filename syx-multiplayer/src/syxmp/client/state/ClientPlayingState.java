@@ -51,6 +51,12 @@ public final class ClientPlayingState extends MpConnectionState {
                 ChatLog.add(from, msg);
             }
             case SERVER_PLAYER_LIST -> {
+                java.util.Set<Integer> before = new java.util.HashSet<>();
+                java.util.Map<Integer, String> names = new java.util.HashMap<>();
+                for (MultiplayerSession.PlayerListEntry e : session.players) {
+                    before.add(e.id);
+                    names.put(e.id, e.username);
+                }
                 session.players.clear();
                 int n = data.readInt();
                 for (int i = 0; i < n; i++) {
@@ -61,14 +67,15 @@ public final class ClientPlayingState extends MpConnectionState {
                     e.status = data.readByte();
                     e.latency = data.readInt();
                     session.players.add(e);
+                    if (!before.remove(e.id) && e.id != session.playerId && !before.isEmpty())
+                        notify(e.username + " joined the game");
                 }
+                for (int gone : before)
+                    notify(names.getOrDefault(gone, "a player") + " left the game");
             }
             case SERVER_SYNC_INFO -> syxmp.desync.SyncCoordinator.addRemoteOpinion(
                     syxmp.desync.ClientSyncOpinion.deserialize(data));
-            case SERVER_CURSOR -> {
-                // Other players' cursors; UI overlay not implemented yet
-                data.readRemaining();
-            }
+            case SERVER_CURSOR -> syxmp.ui.MpCursors.receive(data);
             case SERVER_NOTIFICATION -> MpLog.info("[server] " + data.readString(2048));
             case SERVER_DISCONNECT -> {
                 int reason = data.readByte();
@@ -83,11 +90,21 @@ public final class ClientPlayingState extends MpConnectionState {
         return true;
     }
 
-    /** Minimal chat buffer until a real UI exists. */
+    private static void notify(String s) {
+        MpLog.info(s);
+        ChatLog.add("*", s);
+        try {
+            game.GAME.Notify(s);
+        } catch (RuntimeException e) {
+            // no game yet
+        }
+    }
+
+    /** Chat history shown by the in-game panel and HUD. */
     public static final class ChatLog {
         public static final java.util.ArrayDeque<String> lines = new java.util.ArrayDeque<>();
 
-        static synchronized void add(String from, String msg) {
+        public static synchronized void add(String from, String msg) {
             lines.add(from + ": " + msg);
             while (lines.size() > 100)
                 lines.poll();

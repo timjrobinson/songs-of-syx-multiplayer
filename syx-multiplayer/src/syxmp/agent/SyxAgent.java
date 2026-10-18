@@ -22,10 +22,36 @@ public final class SyxAgent {
         // The menu hook needs a handler before the game reaches the menu;
         // DevAuto is safe to load here (no game classes in its class init).
         SyncTemplates.registerAt(PatchTable.HOOK_MENU_UPDATE, (self, a) -> {
-            syxmp.client.DevAuto.menuTick();
+            syxmp.client.MenuDriver.menuTick(self);
             return false;
         });
+        SyncTemplates.registerAt(PatchTable.HOOK_CORE_ANNIHILATE, (self, a) -> {
+            new Throwable("[SyxMP] CORE.annihilate() called from").printStackTrace(System.out);
+            return false;
+        });
+        SyncTemplates.registerAt(PatchTable.HOOK_CORE_ANNIHILATE_T, (self, a) -> {
+            new Throwable("[SyxMP] CORE.annihilate(Throwable) called from").printStackTrace(System.out);
+            if (a[0] instanceof Throwable t)
+                t.printStackTrace(System.out);
+            return false;
+        });
+        Runtime.getRuntime().addShutdownHook(new Thread(SyxAgent::dumpShutdown, "SyxMP-ShutdownDump"));
         System.out.println("[SyxMP] agent installed");
+    }
+
+    /** Diagnostics: on JVM shutdown, print where the engine threads are. */
+    private static void dumpShutdown() {
+        StringBuilder sb = new StringBuilder("[SyxMP] JVM shutting down; thread stacks:\n");
+        for (var e : Thread.getAllStackTraces().entrySet()) {
+            String n = e.getKey().getName();
+            if (!(n.equals("main") || n.equals("updater") || n.startsWith("SyxMP")))
+                continue;
+            sb.append("  thread ").append(n).append(" state ").append(e.getKey().getState()).append('\n');
+            for (StackTraceElement el : e.getValue())
+                sb.append("    at ").append(el).append('\n');
+        }
+        System.out.println(sb);
+        System.out.flush();
     }
 
     public static void agentmain(String args, Instrumentation inst) {

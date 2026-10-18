@@ -20,10 +20,22 @@ public final class MpHud {
     private MpHud() {
     }
 
+    /** Screen rectangle of the status line; clicking it opens the panel. */
+    public static final int X1 = 24, Y1 = 4, Y2 = 28;
+    public static int x2 = 24;
+
     public static void render(Renderer r) {
-        if (!Multiplayer.active() || broken)
+        if (broken)
             return;
+        if (!Multiplayer.active()) {
+            if (!syxmp.ui.MpStatus.line.isEmpty()
+                    && System.currentTimeMillis() - syxmp.ui.MpStatus.changedAt < 15000) {
+                UI.FONT().M.render(r, syxmp.ui.MpStatus.line, X1, Y1);
+            }
+            return;
+        }
         try {
+            syxmp.ui.MpCursors.render(r);
             StringBuilder sb = new StringBuilder(128);
             MultiplayerSession session = Multiplayer.session;
             sb.append("MP ");
@@ -50,7 +62,8 @@ public final class MpHud {
                 lastStatus = status;
                 text = new GText(UI.FONT().M, status);
             }
-            text.render(r, 24, 1200, 4, 28);
+            text.render(r, X1, X1 + text.width(), Y1, Y2);
+            x2 = X1 + text.width();
         } catch (Throwable t) {
             broken = true;
             MpLog.err("HUD render failed, disabling", t);

@@ -26,6 +26,11 @@ public final class PatchTable {
 
     /** Dev auto-pilot: fires every main-menu frame (handler set in premain). */
     public static final int HOOK_MENU_UPDATE = 4;
+    /** Exit diagnostics: who asked the engine to shut down (handler set in premain). */
+    public static final int HOOK_CORE_ANNIHILATE = 5;
+    public static final int HOOK_CORE_ANNIHILATE_T = 6;
+    /** IMenu.exit2Menu: leaving a game ends the multiplayer session. */
+    public static final int HOOK_EXIT_TO_MENU = 7;
 
     // Sync-method hooks (bound to SyncMethod handlers by SyxSync) start at 100.
     public static final int HOOK_IMMIGRATION_ADMIT = 100;
@@ -68,6 +73,13 @@ public final class PatchTable {
 
         // Dev auto-pilot frame hook on the main menu.
         t.hooks.add(new EntryHook("menu/Menu", "update", "(FD)V", HOOK_MENU_UPDATE));
+
+        // Exit diagnostics (logs the caller; never intercepts).
+        t.hooks.add(new EntryHook("snake2d/CORE", "annihilate", "()V", HOOK_CORE_ANNIHILATE));
+        t.hooks.add(new EntryHook("snake2d/CORE", "annihilate", "(Ljava/lang/Throwable;)V",
+                HOOK_CORE_ANNIHILATE_T));
+
+        t.hooks.add(new EntryHook("view/menu/IMenu", "exit2Menu", "()V", HOOK_EXIT_TO_MENU));
 
         // Synced player verbs (see SyxSync.registerAll for the wire handlers).
         t.hooks.add(new EntryHook("settlement/entry/Immigration", "admit",

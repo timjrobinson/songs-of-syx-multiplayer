@@ -29,7 +29,7 @@ public final class ClientLoadingState extends MpConnectionState {
         switch (packet) {
             case SERVER_WORLD_DATA_START -> {
                 MpLog.info("world download starting");
-                connection.fragmentProgress = pct -> MpLog.debug("world download " + pct + "%");
+                connection.fragmentProgress = pct -> syxmp.ui.MpStatus.set("downloading world " + pct + "%");
             }
             case SERVER_WORLD_DATA -> {
                 connection.fragmentProgress = null;
@@ -58,7 +58,9 @@ public final class ClientLoadingState extends MpConnectionState {
                 TickController.onSimulatingDone = () -> {
                     connection.send(Packets.CLIENT_WORLD_READY);
                     MpLog.info("world ready");
+                    syxmp.ui.MpStatus.set("in game");
                 };
+                syxmp.ui.MpStatus.set("loading world...");
                 connection.changeState(ConnectionStateEnum.CLIENT_PLAYING,
                         new ClientPlayingState(connection, session));
 

@@ -40,8 +40,9 @@ public final class MultiplayerServer {
 
     /** The authoritative lockstep clock (Timer units, TickRate.TIMER_HZ nominal). */
     private int gameTimer;
-    /** Fractional Timer accumulation between net ticks. */
-    private double timerAccum;
+    /** Real milliseconds not yet converted into Timer units (RW's realTime). */
+    private double realTimeMs;
+    private long lastNetTickNanos;
     /** ms of real time each client should spend per Timer unit (paces the slowest client). */
     private volatile float msPerTimerUnit = 1000f / TickRate.TIMER_HZ;
 
@@ -117,32 +118,56 @@ public final class MultiplayerServer {
         long now = System.currentTimeMillis();
         freezeManager.tick(now);
 
-        // Advance the clock unless frozen or someone is too far behind.
-        // (Port of the gameTimer advancement rule in MultiplayerServer.Run.)
-        if (!freezeManager.frozen() && !worldData.creatingJoinPoint() && mayAdvance()) {
-            timerAccum += (double) TickRate.TIMER_HZ / NET_HZ;
-            int whole = (int) timerAccum;
-            timerAccum -= whole;
-            gameTimer += whole;
-        }
+        long nanos = System.nanoTime();
+        if (lastNetTickNanos != 0)
+            realTimeMs += (nanos - lastNetTickNanos) / 1_000_000.0;
+        lastNetTickNanos = nanos;
 
-        // Pace the session at the slowest client's frame time.
-        float maxFrame = 1000f / TickRate.TIMER_HZ;
-        for (ServerPlayer p : playerManager.playingPlayers())
-            maxFrame = Math.max(maxFrame, p.frameTimeMs);
-        msPerTimerUnit = Math.min(maxFrame, 1000f / 15f);
+        // Advance the clock at the pace of the slowest client, up to two
+        // Timer units per net tick (port of MultiplayerServer.Run). Stalls
+        // when nobody is close to the clock or someone is >MAX_BEHIND.
+        // NOTE: the clock must keep running while a join point is being
+        // created — the CREATE_JOIN_POINT command is stamped at the current
+        // gameTimer and the host can only execute it once tickUntil passes
+        // that tick. Stalling here deadlocked every join (live-test finding).
+        List<ServerPlayer> playing = playerManager.playingPlayers();
+        int ticked = 0;
+        while (realTimeMs > 0 && ticked < 2) {
+            if (!freezeManager.frozen() && mayAdvance(playing))
+                gameTimer++;
+            int maxBehind = 0;
+            for (ServerPlayer p : playing)
+                maxBehind = Math.max(maxBehind, p.extrapolatedTicksBehind(gameTimer));
+            double slowdown = Math.min(maxBehind / 60.0, 2.0);
+            realTimeMs -= msPerTimerUnit * (1.0 + slowdown);
+            ticked++;
+        }
+        if (realTimeMs > 0)
+            realTimeMs = 0;
 
         broadcastTimeControl();
+
+        // Pace the session at the slowest client's frame time (clamped).
+        float standard = 1000f / TickRate.TIMER_HZ;
+        float maxFrame = standard;
+        for (ServerPlayer p : playing)
+            maxFrame = Math.max(maxFrame, p.frameTimeMs);
+        msPerTimerUnit = Math.min(maxFrame, standard * 4f);
     }
 
-    private boolean mayAdvance() {
-        List<ServerPlayer> playing = playerManager.playingPlayers();
+    /** Someone must be within 40 ticks of the clock and nobody beyond MAX_BEHIND. */
+    private boolean mayAdvance(List<ServerPlayer> playing) {
         if (playing.isEmpty())
             return false;
-        for (ServerPlayer p : playing)
-            if (p.extrapolatedTicksBehind(gameTimer) > MAX_BEHIND)
+        boolean anyClose = false;
+        for (ServerPlayer p : playing) {
+            int behind = p.extrapolatedTicksBehind(gameTimer);
+            if (behind > MAX_BEHIND)
                 return false;
-        return true;
+            if (behind < 40)
+                anyClose = true;
+        }
+        return anyClose;
     }
 
     private void broadcastTimeControl() {

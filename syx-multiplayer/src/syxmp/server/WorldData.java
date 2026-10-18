@@ -43,8 +43,11 @@ public final class WorldData {
         if (joinPointFuture != null)
             return joinPointFuture;
         joinPointFuture = new CompletableFuture<>();
-        tmpCmds = new ArrayList<>();
+        // Send first, then start buffering: the join-point command itself is
+        // executed by the host BEFORE capturing, so it must not be replayed
+        // by joiners starting from the capture (as in RW's WorldData).
         server.commands.sendJoinPointCommand();
+        tmpCmds = new ArrayList<>();
         return joinPointFuture;
     }
 

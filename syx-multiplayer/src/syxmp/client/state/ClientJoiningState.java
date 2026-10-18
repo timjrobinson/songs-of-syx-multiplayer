@@ -29,6 +29,7 @@ public final class ClientJoiningState extends MpConnectionState {
         ByteWriter w = new ByteWriter(4);
         w.writeInt(MpVersion.PROTOCOL);
         connection.send(Packets.CLIENT_PROTOCOL, w);
+        syxmp.ui.MpStatus.set("connected, joining...");
     }
 
     @Override
@@ -57,14 +58,20 @@ public final class ClientJoiningState extends MpConnectionState {
                 boolean ok = data.readBool();
                 MpLog.info("join data: game=" + gameName + " v" + gameVersion
                         + " mod " + modVersion + " ok=" + ok);
-                if (!ok)
+                if (!ok) {
+                    syxmp.ui.MpStatus.fail("version mismatch: host runs game " + gameVersion
+                            + " / mod " + modVersion);
                     return true; // server will disconnect us with the reason
+                }
+                syxmp.ui.MpStatus.set("waiting for the host's world...");
                 connection.send(Packets.CLIENT_WORLD_REQUEST);
                 connection.changeState(ConnectionStateEnum.CLIENT_LOADING,
                         new ClientLoadingState(connection, session));
             }
             case SERVER_DISCONNECT -> {
-                MpLog.err("disconnected during join");
+                int reason = data.readByte();
+                MpLog.err("disconnected during join: " + syxmp.common.MpDisconnectReason.of(reason));
+                syxmp.ui.MpStatus.fail("rejected by host: " + syxmp.common.MpDisconnectReason.of(reason));
                 Multiplayer.session = null;
             }
             default -> {

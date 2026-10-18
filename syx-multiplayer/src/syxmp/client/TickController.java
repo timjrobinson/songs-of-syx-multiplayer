@@ -59,6 +59,7 @@ public final class TickController {
     public static void gameUpdate(GAME game, double ds, double slowDown) {
         MainThread.drain();
         DevAuto.gameTick();
+        syxmp.ui.GameUi.frame();
 
         if (!Multiplayer.active()) {
             game.update(ds, slowDown);
@@ -74,6 +75,8 @@ public final class TickController {
             return;
         }
         // World blob received and loading: never tick the outgoing game.
+        // The first frame of the NEW game completes the reload.
+        SaveTransfer.finishReloadIfPending();
         if (Multiplayer.reloading)
             return;
 
@@ -112,6 +115,7 @@ public final class TickController {
         int target = Math.min(simulatingTarget, tickUntil);
         while (timer < target && System.currentTimeMillis() - start < SIMULATE_BUDGET_MS)
             runOneTimerUnit();
+        syxmp.ui.MpStatus.set("catching up " + timer + "/" + simulatingTarget);
         if (timer >= simulatingTarget) {
             simulatingTarget = -1;
             Runnable done = onSimulatingDone;

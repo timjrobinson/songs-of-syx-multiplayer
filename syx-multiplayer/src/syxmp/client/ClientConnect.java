@@ -28,6 +28,7 @@ public final class ClientConnect {
         session.username = username;
         session.isHost = false;
         Multiplayer.session = session;
+        syxmp.ui.MpStatus.set("connecting to " + address + ":" + port + "...");
 
         Thread t = new Thread(() -> {
             try {
@@ -39,9 +40,12 @@ public final class ClientConnect {
                         conn.username = username;
                         session.connection = conn;
                         conn.onClosed = (reason, info) -> {
-                            MpLog.err("connection lost: " + reason);
-                            if (Multiplayer.session == session)
+                            MpLog.err("connection lost: " + reason + (info != null ? " (" + info + ")" : ""));
+                            if (Multiplayer.session == session) {
                                 Multiplayer.session = null;
+                                syxmp.ui.MpStatus.fail("disconnected: " + reason
+                                        + (info != null ? " (" + info + ")" : ""));
+                            }
                         };
                         conn.changeState(ConnectionStateEnum.CLIENT_JOINING,
                                 new ClientJoiningState(conn, session, password));
@@ -49,14 +53,35 @@ public final class ClientConnect {
                     } catch (IOException e) {
                         MpLog.err("failed to set up connection", e);
                         Multiplayer.session = null;
+                        syxmp.ui.MpStatus.fail("connection failed: " + e.getMessage());
                     }
                 });
             } catch (IOException e) {
                 MpLog.err("failed to connect to " + address + ":" + port, e);
-                Multiplayer.session = null;
+                if (Multiplayer.session == session)
+                    Multiplayer.session = null;
+                syxmp.ui.MpStatus.fail("could not connect to " + address + ":" + port + ": " + e.getMessage());
             }
         }, "SyxMP-Connect");
         t.setDaemon(true);
         t.start();
+    }
+
+    /** Leave the current session (client or host). Safe to call when not connected. */
+    public static void disconnect(String why) {
+        MultiplayerSession session = Multiplayer.session;
+        if (session == null)
+            return;
+        MpLog.info("leaving session: " + why);
+        Multiplayer.session = null;
+        if (session.connection != null)
+            session.connection.close(syxmp.common.MpDisconnectReason.GENERIC_KEYED, why);
+        if (Multiplayer.localServer != null) {
+            Multiplayer.localServer.stop(why);
+            Multiplayer.localServer = null;
+        }
+        TickController.simulatingTarget = -1;
+        TickController.onSimulatingDone = null;
+        Multiplayer.reloading = false;
     }
 }

@@ -27,7 +27,7 @@ import view.interrupter.IDebugPanel;
  */
 public class SyxMultiplayer implements SCRIPT {
 
-    private static final int SAVE_VERSION = 1;
+    private static final int SAVE_VERSION = 2;
     private static boolean registered;
 
     @Override
@@ -87,6 +87,7 @@ public class SyxMultiplayer implements SCRIPT {
     @Override
     public SCRIPT_INSTANCE createInstance() {
         MpLog.info("createInstance");
+        syxmp.client.SaveTransfer.newGameCreated = true;
         return new Instance();
     }
 
@@ -104,27 +105,50 @@ public class SyxMultiplayer implements SCRIPT {
         }
 
         @Override
+        public void mouseClick(snake2d.MButt button) {
+            if (button != snake2d.MButt.LEFT || !Multiplayer.active())
+                return;
+            int mx = view.main.VIEW.mouse().x(), my = view.main.VIEW.mouse().y();
+            if (mx >= syxmp.client.MpHud.X1 && mx <= syxmp.client.MpHud.x2
+                    && my >= syxmp.client.MpHud.Y1 && my <= syxmp.client.MpHud.Y2)
+                syxmp.ui.MpPanel.get().toggle();
+        }
+
+        @Override
         public void save(FilePutter file) {
             file.i(SAVE_VERSION);
             file.d(TickController.speed);
             file.l(Multiplayer.active() ? Multiplayer.session.rngSeed : 0L);
             file.i(TickController.timer);
+            // v2: the sub-step accumulator is sim state — a joiner that starts
+            // from 0 while the host carries a fraction splits sub-steps
+            // differently after the next speed change (live-test desync).
+            file.f(TickController.timeToTickThrough);
+            file.d(TickController.prevNonZeroSpeed);
         }
 
         @Override
         public void load(FileGetter file) throws IOException {
             int version = file.i();
+            if (version < 1 || version > SAVE_VERSION)
+                return;
             double speed = file.d();
             long rngSeed = file.l();
             int timer = file.i();
-            if (version != SAVE_VERSION)
-                return;
+            float accum = 0;
+            double prevSpeed = 1.0;
+            if (version >= 2) {
+                accum = file.f();
+                prevSpeed = file.d();
+            }
             if (Multiplayer.active()) {
                 TickController.speed = speed;
+                TickController.timeToTickThrough = accum;
+                TickController.prevNonZeroSpeed = prevSpeed;
                 if (rngSeed != 0)
                     Multiplayer.session.rngSeed = rngSeed;
                 MpLog.info("loaded MP state: speed " + speed + " timer " + timer
-                        + " (clock at " + TickController.timer + ")");
+                        + " accum " + accum + " (clock at " + TickController.timer + ")");
             }
         }
 
