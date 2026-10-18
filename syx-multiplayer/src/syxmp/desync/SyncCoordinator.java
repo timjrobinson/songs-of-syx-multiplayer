@@ -45,9 +45,12 @@ public final class SyncCoordinator {
         }
     }
 
-    public static void recordSubStep(int fingerprint) {
-        if (current != null)
+    public static void recordSubStep(int fingerprint, int updateI, int timer) {
+        if (current != null) {
             current.subStepStates.add(fingerprint);
+            current.subStepUpdateI.add(updateI);
+            current.subStepTimer.add(timer);
+        }
     }
 
     public static void recordCommand(int fingerprint) {

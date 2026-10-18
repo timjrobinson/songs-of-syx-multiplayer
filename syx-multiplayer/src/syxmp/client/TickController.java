@@ -231,7 +231,7 @@ public final class TickController {
             BattleSync.step(TickRate.SUBSTEP_DS);
             // One post-step draw fingerprints (seed, updateI, draws consumed):
             // it diverges as soon as any client's sim used the RNG differently.
-            syxmp.desync.SyncCoordinator.recordSubStep(RND.rInt());
+            syxmp.desync.SyncCoordinator.recordSubStep(RND.rInt(), GAME.updateI(), timer);
         } finally {
             Multiplayer.ticking = false;
             syxmp.dev.RndTrace.endSubStep();

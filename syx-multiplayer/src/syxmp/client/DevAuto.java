@@ -32,6 +32,7 @@ public final class DevAuto {
     private static final String AUTOACT = System.getProperty("syxmp.autoact");
     private static int actFrames;
     private static int actIndex;
+    private static int createAtFrame = -1;
 
     private static int menuFrames;
     private static int gameFrames;
@@ -42,7 +43,29 @@ public final class DevAuto {
 
     /** Scripted player actions, issued from UI context so they go through the sync hooks. */
     private static void act(int i) {
-        switch (i % 3) {
+        switch (i % 4) {
+            case 3 -> {
+                // Build a 4x4 stockpile: stage blueprint (AutoSync), area (TOOL), commit (AutoSync).
+                settlement.room.main.placement.RoomPlacer placer = settlement.main.SETT.ROOMS().placement.placer;
+                settlement.room.main.RoomBlueprintImp blue = settlement.main.SETT.ROOMS().STOCKPILE;
+                placer.init(blue, 0);
+                view.tool.PlacableMulti area = (view.tool.PlacableMulti) placer.area();
+                int cx = settlement.main.SETT.TWIDTH / 2, cy = settlement.main.SETT.THEIGHT / 2;
+                for (int r = 6 + (i / 4) * 5; r < cx - 6; r += 4) {
+                    int x = cx - r, y = cy - (i % 5) * 4;
+                    boolean ok = true;
+                    for (int dy = 0; dy < 4 && ok; dy++)
+                        for (int dx = 0; dx < 4 && ok; dx++)
+                            ok = area.isPlacable(x + dx, y + dy, null, view.tool.PLACER_TYPE.SQUARE) == null;
+                    if (ok) {
+                        MpLog.info("[auto] action: stockpile at " + x + "," + y);
+                        syxmp.sync.ToolSync.devPlaceMulti(area, x, y, 4, 4);
+                        createAtFrame = gameFrames + 120; // after the TOOL command has executed locally
+                        return;
+                    }
+                }
+                MpLog.info("[auto] action: no spot for stockpile");
+            }
             case 0 -> {
                 int n = 1 + (i / 3) % 5;
                 MpLog.info("[auto] action: immigration setWanted " + n);
@@ -127,6 +150,17 @@ public final class DevAuto {
             }
         } else {
             framesWithTwo = 0;
+        }
+
+        if (createAtFrame > 0 && gameFrames >= createAtFrame) {
+            createAtFrame = -1;
+            settlement.room.main.placement.RoomPlacer placer = settlement.main.SETT.ROOMS().placement.placer;
+            if (placer.createProblem() == null) {
+                MpLog.info("[auto] action: create room");
+                placer.create();
+            } else {
+                MpLog.info("[auto] stockpile not creatable: " + placer.createProblem());
+            }
         }
 
         if (AUTOACT != null && Multiplayer.active() && Multiplayer.session.isHost

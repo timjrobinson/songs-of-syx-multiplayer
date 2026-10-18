@@ -23,6 +23,9 @@ public final class ClientSyncOpinion {
 
     public final int startTimer;
     public final List<Integer> subStepStates = new ArrayList<>();
+    /** Parallel to subStepStates: GAME.updateI and Timer of each sub-step (diagnostics). */
+    public final List<Integer> subStepUpdateI = new ArrayList<>();
+    public final List<Integer> subStepTimer = new ArrayList<>();
     public final List<Integer> commandStates = new ArrayList<>();
     public boolean simulating;
     public long joinPointHash;
@@ -36,8 +39,11 @@ public final class ClientSyncOpinion {
         w.writeInt(startTimer);
         w.writeBool(simulating);
         w.writeInt(subStepStates.size());
-        for (int s : subStepStates)
-            w.writeInt(s);
+        for (int i = 0; i < subStepStates.size(); i++) {
+            w.writeInt(subStepStates.get(i));
+            w.writeInt(subStepUpdateI.get(i));
+            w.writeInt(subStepTimer.get(i));
+        }
         w.writeInt(commandStates.size());
         for (int s : commandStates)
             w.writeInt(s);
@@ -49,8 +55,11 @@ public final class ClientSyncOpinion {
         ClientSyncOpinion o = new ClientSyncOpinion(r.readInt());
         o.simulating = r.readBool();
         int n = r.readInt();
-        for (int i = 0; i < n; i++)
+        for (int i = 0; i < n; i++) {
             o.subStepStates.add(r.readInt());
+            o.subStepUpdateI.add(r.readInt());
+            o.subStepTimer.add(r.readInt());
+        }
         n = r.readInt();
         for (int i = 0; i < n; i++)
             o.commandStates.add(r.readInt());
@@ -68,8 +77,18 @@ public final class ClientSyncOpinion {
             return "STATE HASH mismatch at join point " + joinPointTimer;
         String r = compareLists(subStepStates, other.subStepStates, "sub-step");
         if (r != null)
-            return r;
+            return r + describeSubSteps(other);
         return compareLists(commandStates, other.commandStates, "command");
+    }
+
+    private String describeSubSteps(ClientSyncOpinion other) {
+        StringBuilder sb = new StringBuilder(" [local: ");
+        for (int i = 0; i < subStepStates.size(); i++)
+            sb.append(subStepTimer.get(i)).append('/').append(subStepUpdateI.get(i)).append(' ');
+        sb.append("| remote: ");
+        for (int i = 0; i < other.subStepStates.size(); i++)
+            sb.append(other.subStepTimer.get(i)).append('/').append(other.subStepUpdateI.get(i)).append(' ');
+        return sb.append(']').toString();
     }
 
     private String compareLists(List<Integer> a, List<Integer> b, String what) {
