@@ -15,6 +15,7 @@ import syxmp.util.MpLog;
 public final class ClientPlayingState extends MpConnectionState {
 
     private final MultiplayerSession session;
+    private boolean desyncDumped;
 
     public ClientPlayingState(ConnectionBase connection, MultiplayerSession session) {
         super(connection);
@@ -67,6 +68,10 @@ public final class ClientPlayingState extends MpConnectionState {
                     e.status = data.readByte();
                     e.latency = data.readInt();
                     session.players.add(e);
+                    if (e.status == 2 && e.id != session.playerId && !desyncDumped) {
+                        desyncDumped = true;
+                        syxmp.dev.RndTrace.dumpRing("player " + e.username + " reported desync");
+                    }
                     if (!before.remove(e.id) && e.id != session.playerId && !before.isEmpty())
                         notify(e.username + " joined the game");
                 }

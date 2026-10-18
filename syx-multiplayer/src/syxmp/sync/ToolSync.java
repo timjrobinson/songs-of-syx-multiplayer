@@ -74,6 +74,13 @@ public final class ToolSync {
         }
     }
 
+    /** A filled rectangular AREA. */
+    public static AREA rect(int x1, int y1, int w, int h) {
+        BitSet bits = new BitSet(w * h);
+        bits.set(0, w * h);
+        return new SyncArea(x1, y1, w, h, bits);
+    }
+
     /** Dev/test: designate a filled rectangle with an area placer through the synced path. */
     public static void devPlaceMulti(PlacableMulti p, int x1, int y1, int w, int h) {
         BitSet bits = new BitSet(w * h);

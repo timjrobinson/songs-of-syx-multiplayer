@@ -56,7 +56,7 @@ public final class DevAuto {
                     boolean ok = true;
                     for (int dy = 0; dy < 4 && ok; dy++)
                         for (int dx = 0; dx < 4 && ok; dx++)
-                            ok = area.isPlacable(x + dx, y + dy, null, view.tool.PLACER_TYPE.SQUARE) == null;
+                            ok = area.isPlacable(x + dx, y + dy, syxmp.sync.ToolSync.rect(x, y, 4, 4), view.tool.PLACER_TYPE.SQUARE) == null;
                     if (ok) {
                         MpLog.info("[auto] action: stockpile at " + x + "," + y);
                         syxmp.sync.ToolSync.devPlaceMulti(area, x, y, 4, 4);
@@ -77,7 +77,7 @@ public final class DevAuto {
                 int cx = settlement.main.SETT.TWIDTH / 2, cy = settlement.main.SETT.THEIGHT / 2;
                 for (int r = 2 + (i / 3) * 3; r < cx - 4; r += 3) {
                     int x = cx + r, y = cy + (i % 7) * 2;
-                    if (p.isPlacable(x, y, null, view.tool.PLACER_TYPE.SQUARE) == null) {
+                    if (p.isPlacable(x, y, syxmp.sync.ToolSync.rect(x, y, 3, 3), view.tool.PLACER_TYPE.SQUARE) == null) {
                         MpLog.info("[auto] action: clear job at " + x + "," + y);
                         syxmp.sync.ToolSync.devPlaceMulti(p, x, y, 3, 3);
                         return;

@@ -28,6 +28,11 @@ public final class RndTrace {
     private static int drawsInStep;
     private static boolean done;
 
+    /** Rolling window of the most recent sub-steps (dumped on desync, like RW's desync traces). */
+    private static final int RING = Integer.getInteger("syxmp.rndtrace.ring", 80);
+    private static final java.util.ArrayDeque<StringBuilder> ring = new java.util.ArrayDeque<>();
+    private static StringBuilder ringCur;
+
     private RndTrace() {
     }
 
@@ -48,7 +53,16 @@ public final class RndTrace {
 
     /** Called from TickController at the start of each sub-step. */
     public static void beginSubStep(int updateI, int timer) {
-        if (!ENABLED || done)
+        if (!ENABLED)
+            return;
+        synchronized (RndTrace.class) {
+            ringCur = new StringBuilder(4096);
+            ringCur.append("## substep updateI=").append(updateI).append(" timer=").append(timer).append('\n');
+            ring.addLast(ringCur);
+            while (ring.size() > RING)
+                ring.pollFirst();
+        }
+        if (done)
             return;
         try {
             if (out == null) {
@@ -126,7 +140,11 @@ public final class RndTrace {
 
     /** Entry hook handler for every RND.r*() method. */
     public static synchronized void onDraw() {
-        if (done || out == null || !(Multiplayer.ticking || loadPhase))
+        if (!(Multiplayer.ticking || loadPhase))
+            return;
+        boolean toFile = !done && out != null;
+        boolean toRing = Multiplayer.ticking && ringCur != null;
+        if (!toFile && !toRing)
             return;
         drawsInStep++;
         StackTraceElement[] st = new Throwable().getStackTrace();
@@ -145,10 +163,32 @@ public final class RndTrace {
             shown++;
         }
         sb.append('\n');
+        if (toRing && ringCur.length() < 2_000_000)
+            ringCur.append(sb);
+        if (toFile) {
+            try {
+                out.write(sb.toString());
+            } catch (IOException e) {
+                done = true;
+            }
+        }
+    }
+
+    /** Write the rolling window to <logs>/syxmp-rnd-desync.txt (both clients call this on a desync). */
+    public static synchronized void dumpRing(String why) {
+        if (!ENABLED)
+            return;
         try {
-            out.write(sb.toString());
+            Path dir = Path.of(System.getProperty("user.home"), ".local", "share", "songsofsyx", "logs");
+            Files.createDirectories(dir);
+            try (BufferedWriter w = Files.newBufferedWriter(dir.resolve("syxmp-rnd-desync.txt"), StandardCharsets.UTF_8)) {
+                w.write("## dump: " + why + "\n");
+                for (StringBuilder s : ring)
+                    w.write(s.toString());
+            }
+            syxmp.util.MpLog.info("desync trace window written (" + ring.size() + " sub-steps)");
         } catch (IOException e) {
-            done = true;
+            syxmp.util.MpLog.err("could not write desync trace", e);
         }
     }
 }

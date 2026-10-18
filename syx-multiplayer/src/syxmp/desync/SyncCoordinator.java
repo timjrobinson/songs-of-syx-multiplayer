@@ -108,6 +108,7 @@ public final class SyncCoordinator {
             return;
         TickController.desynced = true;
         MpLog.err("DESYNC: " + what);
+        syxmp.dev.RndTrace.dumpRing("local detection: " + what);
         ByteWriter w = new ByteWriter(8);
         w.writeInt(atTimer);
         Multiplayer.session.connection.send(Packets.CLIENT_DESYNCED, w);
