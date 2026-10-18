@@ -27,6 +27,11 @@ public final class MpHud {
     public static void render(Renderer r) {
         if (broken)
             return;
+        // First-run notice: drawn every frame, paused or not (the script's
+        // update() only runs while the simulation runs).
+        if (syxmp.SyxMultiplayer.restartNotice != null) {
+            UI.FONT().H2.render(r, syxmp.SyxMultiplayer.restartNotice, X1, Y1 + 40);
+        }
         if (!Multiplayer.active()) {
             if (!syxmp.ui.MpStatus.line.isEmpty()
                     && System.currentTimeMillis() - syxmp.ui.MpStatus.changedAt < 15000) {
