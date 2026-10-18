@@ -47,6 +47,8 @@ public final class PatchTable {
     public static final int HOOK_LOAD_SCREEN = 15;
     /** BattleThreads.unpause: never start the wall-clock battle workers in MP (BattleSync drives them). */
     public static final int HOOK_BATTLE_UNPAUSE = 16;
+    /** Dev: entity update tracing (hooks only with -Dsyxmp.enttrace=1). */
+    public static final int HOOK_ENT_UPDATE = 17;
 
     // Sync-method hooks (bound to SyncMethod handlers by SyxSync) start at 100.
     public static final int HOOK_IMMIGRATION_ADMIT = 100;
@@ -138,6 +140,11 @@ public final class PatchTable {
             for (String[] m : new String[][] {{"rInt", "(I)I"}, {"rInt", "()I"}, {"rFloat", "()F"}, {"rBoolean", "()Z"}})
                 t.redirects.add(new CallRedirect(cls, null, "snake2d/util/rnd/RND", m[0], m[1],
                         "syxmp/client/DetRnd", "*"));
+
+        if ("1".equals(System.getProperty("syxmp.enttrace"))) {
+            t.hooks.add(new EntryHook("settlement/entity/humanoid/Humanoid", "update", "(D)Z", HOOK_ENT_UPDATE));
+            t.hooks.add(new EntryHook("settlement/entity/animal/Animal", "update", "(D)Z", HOOK_ENT_UPDATE));
+        }
 
         // Dev-only RND call-site tracing (zero cost unless enabled: hooks absent).
         if ("1".equals(System.getProperty("syxmp.rndtrace"))) {

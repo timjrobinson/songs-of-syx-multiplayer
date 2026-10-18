@@ -57,6 +57,11 @@ public final class SyxAgent {
             syxmp.client.TickController.seedAfterCreate();
             return false;
         });
+        if ("1".equals(System.getProperty("syxmp.enttrace")))
+            SyncTemplates.registerAt(PatchTable.HOOK_ENT_UPDATE, (self, a) -> {
+                syxmp.dev.EntTrace.onUpdate(self, a);
+                return false;
+            });
         if (syxmp.dev.RndTrace.ENABLED)
             SyncTemplates.registerAt(PatchTable.HOOK_RND_DRAW, (self, a) -> {
                 syxmp.dev.RndTrace.onDraw();
