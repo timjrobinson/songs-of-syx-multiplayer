@@ -53,6 +53,10 @@ public final class SyxAgent {
             syxmp.client.TickController.seedForLoad();
             return false;
         });
+        SyncTemplates.registerAt(PatchTable.HOOK_LOAD_SCREEN, (self, a) -> {
+            syxmp.client.TickController.seedAfterCreate();
+            return false;
+        });
         if (syxmp.dev.RndTrace.ENABLED)
             SyncTemplates.registerAt(PatchTable.HOOK_RND_DRAW, (self, a) -> {
                 syxmp.dev.RndTrace.onDraw();

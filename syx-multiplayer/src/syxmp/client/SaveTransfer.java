@@ -65,6 +65,8 @@ public final class SaveTransfer {
         // was identical (unsaved construction-time random state then matches).
         MpLog.info("state loaded; game recreated at timer " + TickController.timer
                 + " rndProbe=" + Integer.toHexString(snake2d.util.rnd.RND.rInt()));
+        // Defensive: the first lockstep unit starts from a known state anyway.
+        snake2d.util.rnd.RND.setSeed(TickController.mixSeed(Multiplayer.session.rngSeed ^ 0x2B1D5EL, TickController.timer));
         if (r != null)
             r.run();
     }

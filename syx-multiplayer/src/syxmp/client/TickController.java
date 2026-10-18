@@ -248,6 +248,16 @@ public final class TickController {
         MpLog.info("seeded RND for load at timer " + timer);
     }
 
+    /** Second deterministic seed: after GAME+VIEW construction, before the save data loads. */
+    public static void seedAfterCreate() {
+        MultiplayerSession session = Multiplayer.session;
+        if (session == null || !Multiplayer.reloading)
+            return;
+        RND.setSeed(mixSeed(session.rngSeed ^ 0x4F7E12C3L, timer));
+        syxmp.dev.RndTrace.mark("## after-create reseed");
+        MpLog.info("reseeded RND after game creation at timer " + timer);
+    }
+
     public static int mixSeed(long sessionSeed, int tick) {
         long z = sessionSeed + 0x9E3779B97F4A7C15L * (tick + 1);
         z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;

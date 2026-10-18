@@ -43,6 +43,8 @@ public final class PatchTable {
     public static final int HOOK_GAME_LOAD = 13;
     /** PlacableMultiTool.place(): area tools commit here. */
     public static final int HOOK_TOOL_MULTI_PLACE = 14;
+    /** ILoadScreen.activate: called by GameLoader between GAME/VIEW creation and the save load. */
+    public static final int HOOK_LOAD_SCREEN = 15;
 
     // Sync-method hooks (bound to SyncMethod handlers by SyxSync) start at 100.
     public static final int HOOK_IMMIGRATION_ADMIT = 100;
@@ -114,6 +116,13 @@ public final class PatchTable {
         // at the same timer).
         t.hooks.add(new EntryHook("game/save/GameLoader", "getState", "()Lsnake2d/CORE_STATE;",
                 HOOK_GAME_LOAD));
+        // ...and again after GAME+VIEW construction, right before the save
+        // data is loaded (GameLoader.java:57): UI construction in between
+        // draws from RND in locally varying amounts (e.g. the battle editor
+        // generates random armies through sim constructors), which would
+        // shift every RND-initialized field of the entity pools built during
+        // the load.
+        t.hooks.add(new EntryHook("view/interrupter/ILoadScreen", "activate", "()V", HOOK_LOAD_SCREEN));
 
         // Cosmetic RND users inside the sim tick get their own stream.
         addVisualRnd(t);

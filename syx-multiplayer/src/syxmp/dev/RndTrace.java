@@ -100,6 +100,16 @@ public final class RndTrace {
         }
     }
 
+    public static synchronized void mark(String line) {
+        if (!ENABLED || out == null)
+            return;
+        try {
+            out.write(line + "\n");
+        } catch (IOException e) {
+            done = true;
+        }
+    }
+
     public static synchronized void endLoad() {
         if (!ENABLED || out == null)
             return;

@@ -22,7 +22,7 @@ public final class Determinism {
      * unit from TickController instead.
      */
     public static void afterTick(GAME game) {
-        if (Multiplayer.active() && TickController.inLockstep())
+        if (Multiplayer.active() && (Multiplayer.reloading || TickController.inLockstep()))
             return;
         syxmp.dev.VerbTrace.uiContext = false;
         Multiplayer.ticking = true;

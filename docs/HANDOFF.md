@@ -38,6 +38,28 @@ supersedes them where they conflict.)
   its **object path** from static roots (`ObjectPaths`, anchors for
   entities/rooms). Unsyncable calls are logged `UNSYNCED (local only)`.
 
+## Load-phase determinism (the big lesson of session 2)
+
+A joiner starts from LOADED state, so every client reloads at join points.
+But a load is not deterministic by itself: GAME/SETT/VIEW construction and
+the save load draw thousands of times from the global RND, and anything not
+saved keeps its construction-time random value (Intervals.rans, TForest
+sprite speeds, entity pool fields, FBoost.randomize...). Measures, in order
+of the trace evidence (`e2e/diffload.sh` diffs the load-phase draws):
+
+1. RND seeded from (sessionSeed, timer) at `GameLoader.getState` entry; the
+   session seed is carried in SERVER_WORLD_DATA so the first load is right.
+2. Reseeded again at `ILoadScreen.activate` (between GAME+VIEW creation and
+   the save load): VIEW construction draws vary per client (battle editor
+   generates random armies through sim constructors).
+3. Per-process random tables built in static initializers get a fixed seed
+   (`DetRnd`): TileUpdater's 64x64 update order, RANMAP.
+4. Cosmetic classes that draw inside the sim tick or during load use a
+   separate stream (`VisualRnd` via CallRedirect of RND.* in those classes):
+   minimap, light flicker, audio, sprite/renderer/particle/anim classes,
+   gore pools, whole view/menu/gui layers.
+5. First-frame vanilla `afterTick` is skipped while reloading.
+
 ## Dev tooling (all off by default)
 
 - `syx-multiplayer/e2e/run-pair.sh [jvm args]` — host + joiner, windowed side
