@@ -206,12 +206,15 @@ public final class ObjectPaths {
         MpLog.info("object path index: " + paths.size() + " objects in "
                 + (System.currentTimeMillis() - start) + "ms (build " + builds + ")"
                 + (visited >= MAX_OBJECTS ? " TRUNCATED" : ""));
-        if (builds == 1 || visited >= MAX_OBJECTS)
-            logPrefixStats();
+        if (builds == 1 || visited >= MAX_OBJECTS) {
+            logPrefixStats(3, 12);
+            if (visited >= MAX_OBJECTS)
+                logPrefixStats(5, 25);
+        }
     }
 
     /** Which subtrees dominate the index (for tuning the skip lists). */
-    private static void logPrefixStats() {
+    private static void logPrefixStats(int segments, int show) {
         Map<String, Integer> counts = new HashMap<>();
         for (String p : paths.values()) {
             int cut = p.length();
@@ -219,18 +222,19 @@ public final class ObjectPaths {
             for (int i = 0; i < p.length(); i++) {
                 char c = p.charAt(i);
                 if (c == '.' || c == '[') {
-                    if (++segs == 3) {
+                    if (++segs == segments) {
                         cut = i;
                         break;
                     }
                 }
             }
-            counts.merge(p.substring(0, cut), 1, Integer::sum);
+            String key = p.substring(0, cut).replaceAll("\\[\\d+\\]", "[]");
+            counts.merge(key, 1, Integer::sum);
         }
         List<Map.Entry<String, Integer>> top = new ArrayList<>(counts.entrySet());
         top.sort((a, b) -> b.getValue() - a.getValue());
-        StringBuilder sb = new StringBuilder("object path index, largest subtrees:");
-        for (int i = 0; i < Math.min(12, top.size()); i++)
+        StringBuilder sb = new StringBuilder("object path index, largest subtrees (" + segments + " segments):");
+        for (int i = 0; i < Math.min(show, top.size()); i++)
             sb.append("\n    ").append(top.get(i).getValue()).append("  ").append(top.get(i).getKey());
         MpLog.info(sb.toString());
     }

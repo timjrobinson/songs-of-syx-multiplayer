@@ -1,5 +1,8 @@
 # HANDOFF2 — what is NOT done, and exactly how to finish it
 
+> Superseded by `docs/HANDOFF3.md` (session 3 executed most of this list).
+> Kept for the desync workflow (§1) and the Steam notes (§5).
+
 Written 2026-10-18 at the end of session 2. Read `CLAUDE.md` first (the
 rules), then this file. `docs/HANDOFF.md` has the session chronology and the
 determinism catalogue; this file is the forward-looking work list.

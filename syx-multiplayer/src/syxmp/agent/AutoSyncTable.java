@@ -199,8 +199,12 @@ public final class AutoSyncTable {
         "game/faction/diplomacy/DipStance set (Lgame/faction/Faction;Lgame/faction/Faction;)V",
         "game/faction/diplomacy/DipStance set (Lgame/faction/npc/FactionNPC;)V",
         "game/faction/player/emmi/EmiType set (Ljava/lang/Object;I)V",
-        // ---- Diplomacy messages
+        // ---- Diplomacy messages (the deal itself goes through SyncActions)
         "game/faction/npc/NPCRequest expire ()V",
+        "game/faction/npc/NPCRequest clear ()V",
+        "game/faction/royalty/opinion/OpsGifts makeDeal (Lgame/faction/npc/FactionNPC;D)V",
+        "game/faction/FCredits inc (DLgame/faction/FCredits$CTYPE;)V",
+        "game/raiding/RaidingCurrent clear ()V",
         // ---- Research
         "game/faction/player/PTech levelSet (Linit/tech/TECH;I)V",
         // ---- Events / raiders

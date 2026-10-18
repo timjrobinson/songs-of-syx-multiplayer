@@ -63,15 +63,18 @@ Enable it in the game's launcher mod list.
   stable object IDs, and a save system we can run in memory for state transfer
   and desync hashing.
 
-## Status
+## Status (0.3.0)
 
-Core engine complete and headless-tested: relay server, join handshake with
-fragmented world transfer, command stamping and the tick-window interlock,
-bytecode transformer (verified against the real game classes), lockstep tick
-controller, save capture/apply, desync sync-opinions, game-speed syncing, and
-the first synced player verb (immigration). Not yet play-tested in the running
-game — that's the next milestone. See `CLAUDE.md` for the detailed roadmap and
-`docs/` for the architecture studies.
+Playable co-op: hosting from the main menu or in-game, joining by address
+with world transfer and catch-up, shared speed, cursors, chat with host
+commands, automatic resync after a desync, desync reports. Nearly every
+settlement-management action the UI offers is synced (170 hooked verbs plus
+composite commands for events, diplomacy deals, tribute and region
+buildings); tactical battle orders, world battle prompts, army recruiting and
+a few renames are still local — see `docs/sync-coverage.md`. Steam
+friends/invites are implemented but off by default and untested. Player
+instructions: `syx-multiplayer/mod/README.txt`; developer map: `CLAUDE.md`
+and `docs/HANDOFF3.md`.
 
 Run the headless test suite with `syx-multiplayer/test.sh`.
 

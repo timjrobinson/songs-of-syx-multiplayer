@@ -65,6 +65,20 @@ public final class Determinism {
         return p.isBusty();
     }
 
+    /**
+     * Replaces {@code RD.BUILDINGS().tmp().level(bu, reg)} inside RDBuilding
+     * (the sim's boost/lock code, RDBuilding.java:328-523). The preview
+     * buffer is the local building popup's draft; in MP the sim only ever
+     * sees the real level (RDLevelsTmp.java:31 returns the draft while the
+     * popup is open on this client).
+     */
+    public static int rdLevel(world.region.building.RDLevelsTmp tmp, world.region.building.RDBuilding bu,
+            world.map.regions.Region reg) {
+        if (Multiplayer.active())
+            return bu.level.get(reg);
+        return tmp.level(bu, reg);
+    }
+
     public static boolean embryoIs(MAP_BOOLEAN map, int tx, int ty) {
         if (Multiplayer.active() && map == SETT.ROOMS().placement.embryo)
             return false;

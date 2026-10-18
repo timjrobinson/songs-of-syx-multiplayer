@@ -84,6 +84,7 @@ public final class TickController {
         Multiplayer.gameThread = Thread.currentThread();
         syxmp.steam.SteamMp.pump();
         MainThread.drain();
+        syxmp.sync.SyncActions.frame();
         DevAuto.gameTick();
 
         if (!Multiplayer.active()) {

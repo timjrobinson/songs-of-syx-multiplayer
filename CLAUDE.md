@@ -7,8 +7,12 @@ desync detection. "Syncs and communicates in all the same ways, just syncs
 Songs of Syx data."
 
 **Deep reference docs (read these before touching the sync engine):**
-- `docs/HANDOFF2.md` — **START HERE**: what is NOT done and exactly how to
-  finish it (desync workflow, sync-coverage gaps, open hazards, install gaps)
+- `docs/HANDOFF3.md` — **START HERE**: session 3 results (170 synced verbs,
+  determinism fixes, installer, chat commands) and what is still open
+- `docs/sync-coverage.md` — every UI→sim mutation point, how each is synced,
+  and the list of still-local actions
+- `docs/HANDOFF2.md` — session 2 work list (mostly executed in session 3;
+  §1 desync workflow and §5 Steam notes still apply)
 - `docs/HANDOFF.md` — session chronology, verified results, the determinism
   catalogue and dev tooling (sessions 1 and 2)
 - `docs/rimworld-mp-architecture.md` — the RW-MP blueprint being ported
@@ -279,24 +283,36 @@ Wire protocol (packets/commands) is mirrored in `syxmp.common.Packets` /
   (tickUntil/sentCmds interlock), MainThread, SaveTransfer, JoinPoints,
   HostUtil, ClientConnect, ClientCommands, Hooks, MpHud, state/
 - `src/syxmp/sync/` — Sync (registry, syncId=index), SyncMethod,
-  SyncSerialization + SyxSerialization (SoS workers), SyxSync (the
-  registration table — the file that grows as verbs get synced)
-- `src/syxmp/agent/` — SyxAgent (premain), MpTransformer (ASM), PatchTable,
-  SyncTemplates, AgentInstaller
-- `src/syxmp/desync/` — ClientSyncOpinion, SyncCoordinator
-- `test/HeadlessTest.java` + `test.sh` — no-game validation: transformer
-  against real game classes (hooked method skips body), full TCP join
-  handshake + fragmented world transfer + command round-trip against a live
-  server. Run `./test.sh` after every change.
+  SyncSerialization + SyxSerialization (SoS workers), SyxSync (explicit
+  registrations), AutoSync (generic setter sync; the table is
+  `agent/AutoSyncTable`), ObjectPaths, ToolSync (map tools), FieldSync
+  (PUTFIELD redirects), UiRedirects (generic containers at UI call sites),
+  SyncActions (composite commands: events, deals, tribute, region buildings)
+- `src/syxmp/agent/` — SyxAgent (premain), MpTransformer (ASM: entry hooks,
+  call redirects, PUTFIELD redirects, <clinit> RND), PatchTable,
+  AutoSyncTable (METHODS + FIELDS), SyncTemplates, AgentInstaller
+- `src/syxmp/desync/` — ClientSyncOpinion, SyncCoordinator, DesyncReport
+- `src/syxmp/ui/` — MpMenuScreen (host/join + host settings), MpPanel (chat,
+  players), MpHud, MpCursors, MpSettings, RestartDialog
+- `test/HeadlessTest.java` + `test.sh` — no-game validation: every
+  AutoSyncTable entry resolves against the shipped jar, transformer against
+  real game classes (hooked method skips body), full TCP join handshake +
+  fragmented world transfer + command round-trip against a live server. Run
+  `./test.sh` after every change.
 
-## Current status (2026-10-18, end of session 2)
+## Current status (2026-10-18, end of session 3)
 
-Verified on two real machines: join from menu or in-game, world transfer,
-lockstep, cursors, chat, auto-resync. Determinism soaks: 23 min idle at
-speed 1 and 20 min at speed 5 with 22 scripted synced actions, zero desyncs.
-Real two-human play still desyncs sometimes (causes unread: see
-`docs/HANDOFF2.md` §1). Sync coverage is thin (§2 there). Steam is opt-in and
-untested. Distributable: `syx-multiplayer/package.sh` → `dist/*.zip`.
+Verified on two real machines (session 2): join from menu or in-game, world
+transfer, lockstep, cursors, chat, auto-resync. Session 3: sync coverage is
+now broad (170 AutoSync verbs + 12 field writes + composite commands for
+events/deals/tribute/region buildings; `docs/sync-coverage.md` lists what is
+still local: tactical battle orders, world battle prompts, recruiting,
+autonomy, renames, single-room copy). Battle-view gate, autosave and
+Warn/Error are deterministic in MP. Pair soak with scripted actions: 5+ clean
+minutes at speed 5 (paused-step experiment desynced and is off; see
+HANDOFF3). Not yet play-tested by humans with the new table. Steam is opt-in
+and untested. Distributable: `syx-multiplayer/package.sh` → `dist/*.zip`;
+version 0.3.0, protocol 6.
 
 ## Determinism rules (every change must respect these)
 

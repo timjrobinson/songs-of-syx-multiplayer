@@ -20,7 +20,9 @@ public enum CommandType {
     /** string methodKey + string targetPath + args — generic setter sync (AutoSync). */
     SYNC_AUTO,
     /** byte kind + placable path + tiles/area — map tool placement (ToolSync). */
-    TOOL;
+    TOOL,
+    /** byte kind + payload — composite UI actions: event choice, deal, tribute, region buildings (SyncActions). */
+    ACTION;
 
     private static final CommandType[] VALUES = values();
 

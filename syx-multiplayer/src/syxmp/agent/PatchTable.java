@@ -263,6 +263,32 @@ public final class PatchTable {
                     "syxmp/sync/UiRedirects", "arrayIntSet"));
         }
 
+        // Composite UI actions (SyncActions): the one call in the handler
+        // that commits the action is redirected and the rest is skipped.
+        t.redirects.add(new CallRedirect("game/event/engine/EventMessage*", null,
+                "game/event/engine/EVENT_HANDLER", "choiceSelect", "(Lgame/event/engine/Event;I)V",
+                "syxmp/sync/SyncActions", "eventChoiceSelect"));
+        t.redirects.add(new CallRedirect("game/event/engine/EventMessage*", null,
+                "game/event/actions/EventAction", "exe", "(Lgame/event/engine/Event;Lgame/event/engine/EContext;)V",
+                "syxmp/sync/SyncActions", "eventActionExe"));
+        t.redirects.add(new CallRedirect("game/event/engine/EventMessage*", null,
+                "game/event/engine/EVENT_HANDLER", "set", "(Lgame/event/engine/Event;ZZZZ)V",
+                "syxmp/sync/SyncActions", "eventSet"));
+        for (String ui : new String[] {"view/world/ui/faction/UIDiplomacy*", "view/ui/diplomacy/UIDipMessDeal*"})
+            t.redirects.add(new CallRedirect(ui, null,
+                    "game/faction/diplomacy/deal/Deal", "execute", "(Z)D",
+                    "syxmp/sync/SyncActions", "dealExecute"));
+        t.redirects.add(new CallRedirect("game/raiding/MessDemand*", null,
+                "game/raiding/MessDemand$Demand", "pay", "()V",
+                "syxmp/sync/SyncActions", "tributePay"));
+        t.redirects.add(new CallRedirect("view/world/ui/region/PlayBuildingsPop*", null,
+                "world/region/building/RDLevelsTmp", "accept", "()V",
+                "syxmp/sync/SyncActions", "regionBuildAccept"));
+        // The building popup's draft levels must never reach the sim.
+        t.redirects.add(new CallRedirect("world/region/building/RDBuilding*", null,
+                "world/region/building/RDLevelsTmp", "level", "(Lworld/region/building/RDBuilding;Lworld/map/regions/Region;)I",
+                "syxmp/client/Determinism", "rdLevel"));
+
         // Direct field assignments from UI code (AutoSyncTable.FIELDS).
         for (String[] f : AutoSyncTable.FIELDS)
             t.fieldRedirects.add(new FieldRedirect(f[0], f[1], f[2], f[3]));
