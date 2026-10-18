@@ -52,6 +52,32 @@ public class SyxMultiplayer implements SCRIPT {
 
     /** Set when this run installed the agent and the game must be restarted. */
     public static String restartNotice;
+    private static boolean constructed;
+
+    /**
+     * The main menu instantiates every script factory at startup
+     * (menu/ScRandom.java:260 via ScriptEngine.getAll), so this runs before
+     * any game exists: the earliest point at which a no-agent process can
+     * wire the agent into the launcher settings for the next start.
+     */
+    public SyxMultiplayer() {
+        if (constructed)
+            return;
+        constructed = true;
+        MpLog.info("Syx Multiplayer " + syxmp.common.MpVersion.VERSION + " loaded; agent "
+                + (SyxAgent.isActive() ? "active" : "NOT ACTIVE"));
+        if (!SyxAgent.isActive())
+            noteInstall(AgentInstaller.ensureInstalled());
+    }
+
+    private static void noteInstall(String result) {
+        if (AgentInstaller.restartNeeded())
+            restartNotice = "Syx Multiplayer is installed. QUIT and RESTART the game "
+                    + "(launcher included) to enable multiplayer.";
+        else
+            restartNotice = "Syx Multiplayer could not enable itself: " + result
+                    + "\nSee logs/syxmp.log and the mod's README.";
+    }
 
     @Override
     public void initBeforeGameCreated() {
@@ -59,15 +85,8 @@ public class SyxMultiplayer implements SCRIPT {
             registered = true;
             SyxSync.registerAll();
             Hooks.installAll();
-            MpLog.info("agent " + (SyxAgent.isActive() ? "active" : "NOT ACTIVE"));
-            if (!SyxAgent.isActive()) {
-                // First run after installing the mod: wire the agent into the
-                // launcher settings ourselves; it takes effect on the next start.
-                String result = AgentInstaller.install();
-                MpLog.info("agent auto-install: " + result);
-                restartNotice = "Syx Multiplayer installed. Please QUIT and RESTART the game "
-                        + "(including the launcher) to enable multiplayer.";
-            }
+            if (!SyxAgent.isActive())
+                noteInstall(AgentInstaller.ensureInstalled());
         }
     }
 
@@ -84,6 +103,7 @@ public class SyxMultiplayer implements SCRIPT {
         });
         IDebugPanel.add("MP: status", () -> MpLog.info(status()));
         IDebugPanel.add("MP: install agent", () -> MpLog.info(AgentInstaller.install()));
+        IDebugPanel.add("MP: uninstall agent", () -> MpLog.info(AgentInstaller.uninstall()));
     }
 
     public static String status() {
@@ -105,14 +125,16 @@ public class SyxMultiplayer implements SCRIPT {
 
     public static final class Instance implements SCRIPT_INSTANCE {
 
-        private int noticeTicks;
+        private boolean noticeShown;
 
         @Override
         public void update(double ds) {
             // The lockstep loop lives in TickController, driven from the
             // patched VIEW.update edge — nothing to do per sub-step here.
-            if (restartNotice != null && noticeTicks++ % 600 == 0)
-                game.GAME.Notify(restartNotice);
+            if (restartNotice != null && !noticeShown) {
+                noticeShown = true;
+                syxmp.ui.RestartDialog.show(restartNotice);
+            }
         }
 
         @Override

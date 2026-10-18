@@ -109,10 +109,12 @@ public final class SyncCoordinator {
         TickController.desynced = true;
         MpLog.err("DESYNC: " + what);
         syxmp.dev.RndTrace.dumpRing("local detection: " + what);
+        java.nio.file.Path report = DesyncReport.write(what, local, remote);
         ByteWriter w = new ByteWriter(8);
         w.writeInt(atTimer);
         Multiplayer.session.connection.send(Packets.CLIENT_DESYNCED, w);
-        syxmp.client.state.ClientPlayingState.ChatLog.add("*", "desync detected (" + what + "); resyncing");
+        syxmp.client.state.ClientPlayingState.ChatLog.add("*", "desync detected (" + what + "); resyncing"
+                + (report != null ? " — report: " + report.getFileName() : ""));
         try {
             game.GAME.Notify("SyxMP: desync detected, resyncing...");
         } catch (RuntimeException e) {

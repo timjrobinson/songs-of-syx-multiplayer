@@ -197,14 +197,23 @@ public final class TickController {
             }
         }
 
-        float timePerTick = TickRate.timePerTick(speed);
+        // GameSpeed.update clamps the speed to 25 while enemies are on the map
+        // (GameSpeed.java:38); the enemy count is sim state, so this is
+        // identical on every client.
+        double effective = speed;
+        if (effective > 25 && GAME.ARMIES().enemy().men() > 0)
+            effective = 25;
+        float timePerTick = TickRate.timePerTick(effective);
         if (timePerTick > 0) {
             timeToTickThrough += 1f;
             while (timeToTickThrough >= timePerTick) {
                 timeToTickThrough -= timePerTick;
                 runSubStep();
             }
+        } else {
+            runPausedStep();
         }
+        mirrorVanillaSpeed();
         timer++;
         if (timer % 600 == 0)
             MpLog.info("clock: timer=" + timer + "/" + tickUntil
@@ -235,6 +244,43 @@ public final class TickController {
         } finally {
             Multiplayer.ticking = false;
             syxmp.dev.RndTrace.endSubStep();
+        }
+    }
+
+    /**
+     * Vanilla's paused frame (GAME.java:258-265): every GameResource's
+     * update(0) runs and updateI advances, which is what refreshes the
+     * updateI-keyed caches (GAME.Cache) and the tile/overlay updaters while
+     * the player builds in pause. In MP it runs once per Timer unit when the
+     * synced speed is 0, reseeded, so every client does the same.
+     */
+    private static void runPausedStep() {
+        if (currentGame == null)
+            return;
+        Multiplayer.ticking = true;
+        try {
+            RND.setSeed(mixSeed(Multiplayer.session.rngSeed ^ 0x7A05EDL, timer));
+            GAME.SPEED.speedSet(0); // GameSpeed.update returns 0 -> paused branch
+            currentGame.update(0, 0);
+            syxmp.desync.SyncCoordinator.recordSubStep(RND.rInt(), GAME.updateI(), timer);
+        } finally {
+            Multiplayer.ticking = false;
+        }
+    }
+
+    /**
+     * Keep the vanilla GameSpeed showing the synced speed so the HUD speed
+     * buttons and SPEED.isPaused() readers outside the tick see the truth.
+     * GAME.update(double) sets it to 1.0 before every sub-step anyway
+     * (GAME.java:237), so the sim never observes this value.
+     */
+    private static void mirrorVanillaSpeed() {
+        Multiplayer.ticking = true;
+        try {
+            if (GAME.SPEED.speedTarget() != speed)
+                GAME.SPEED.speedSet(speed);
+        } finally {
+            Multiplayer.ticking = false;
         }
     }
 

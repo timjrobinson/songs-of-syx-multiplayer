@@ -81,11 +81,17 @@ public final class ClientPlayingState extends MpConnectionState {
             case SERVER_SYNC_INFO -> syxmp.desync.SyncCoordinator.addRemoteOpinion(
                     syxmp.desync.ClientSyncOpinion.deserialize(data));
             case SERVER_CURSOR -> syxmp.ui.MpCursors.receive(data);
-            case SERVER_NOTIFICATION -> MpLog.info("[server] " + data.readString(2048));
+            case SERVER_NOTIFICATION -> {
+                String text = data.readString(2048);
+                MpLog.info("[server] " + text);
+                ChatLog.add("server", text);
+            }
             case SERVER_DISCONNECT -> {
                 int reason = data.readByte();
                 MpLog.err("disconnected by server: " + MpDisconnectReason.of(reason));
                 Multiplayer.session = null;
+                syxmp.ui.MpStatus.fail("disconnected by host: " + MpDisconnectReason.of(reason));
+                notify("disconnected: " + MpDisconnectReason.of(reason));
                 connection.close(MpDisconnectReason.of(reason), null);
             }
             default -> {

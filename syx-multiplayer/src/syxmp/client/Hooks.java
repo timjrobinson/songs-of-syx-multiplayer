@@ -57,6 +57,26 @@ public final class Hooks {
         // Battle workers: never threaded while in multiplayer.
         SyncTemplates.registerAt(PatchTable.HOOK_BATTLE_UNPAUSE, (self, args) -> Multiplayer.active());
 
+        // Autosave is wall-clock driven and would stall one client (and write
+        // a host-side save) — never in MP. Players save through the menu.
+        SyncTemplates.registerAt(PatchTable.HOOK_AUTOSAVE, (self, args) -> Multiplayer.active());
+
+        // GAME.Warn pauses the game and GAME.Error throws depending on the
+        // local DEVELOPER/DEBUG flags (GAME.java:412-435). In MP every client
+        // takes the same path: log with origin, continue.
+        SyncTemplates.registerAt(PatchTable.HOOK_GAME_WARN, (self, args) -> {
+            if (!Multiplayer.active())
+                return false;
+            MpLog.err("game warning: " + args[0], new Throwable("origin"));
+            return true;
+        });
+        SyncTemplates.registerAt(PatchTable.HOOK_GAME_ERROR, (self, args) -> {
+            if (!Multiplayer.active())
+                return false;
+            MpLog.err("game error (continuing, as in developer mode): " + args[0], new Throwable("origin"));
+            return true;
+        });
+
         // Pathfinder: long-range jobs computed synchronously while in multiplayer.
         SyncTemplates.registerAt(PatchTable.HOOK_PATH_PREP, (self, args) -> PathSync.prep(self, args));
 

@@ -1,6 +1,7 @@
 package syxmp.server.state;
 
 import syxmp.common.CommandType;
+import syxmp.common.MpDisconnectReason;
 import syxmp.common.Packets;
 import syxmp.net.ByteReader;
 import syxmp.net.ByteWriter;
@@ -45,6 +46,10 @@ public final class ServerPlayingState extends MpConnectionState {
                 String msg = data.readString(2048);
                 if (msg == null || msg.isBlank())
                     return true;
+                if (msg.startsWith("/")) {
+                    chatCommand(msg.trim());
+                    return true;
+                }
                 ByteWriter w = new ByteWriter();
                 w.writeString(player.username());
                 w.writeString(msg);
@@ -99,6 +104,80 @@ public final class ServerPlayingState extends MpConnectionState {
             }
         }
         return true;
+    }
+
+    /**
+     * Server-side chat commands (RW-MP's ChatCmdHandler): the host moderates
+     * through chat, no extra packets. Replies go back as SERVER_NOTIFICATION.
+     */
+    private void chatCommand(String msg) {
+        String[] parts = msg.split("\\s+", 2);
+        String cmd = parts[0].toLowerCase();
+        String arg = parts.length > 1 ? parts[1].trim() : "";
+        switch (cmd) {
+            case "/help" -> reply("commands: /players, /kick <name> (host), /joinpoint (host), /help");
+            case "/players" -> {
+                StringBuilder sb = new StringBuilder("players:");
+                for (ServerPlayer p : server.playerManager.players())
+                    sb.append(' ').append(p.username()).append(p.isHost() ? "(host)" : "")
+                      .append(p.status == ServerPlayer.Status.DESYNCED ? "[desynced]" : "")
+                      .append(p.status == ServerPlayer.Status.JOINING ? "[joining]" : "");
+                reply(sb.toString());
+            }
+            case "/kick" -> {
+                if (!player.isHost()) {
+                    reply("only the host can kick");
+                    return;
+                }
+                ServerPlayer target = null;
+                for (ServerPlayer p : server.playerManager.players())
+                    if (p.username().equalsIgnoreCase(arg))
+                        target = p;
+                if (target == null) {
+                    reply("no player named '" + arg + "'");
+                    return;
+                }
+                if (target.isHost()) {
+                    reply("cannot kick the host");
+                    return;
+                }
+                kick(target, MpDisconnectReason.KICKED);
+                broadcastNotice(target.username() + " was kicked by the host");
+            }
+            case "/joinpoint" -> {
+                if (!player.isHost()) {
+                    reply("only the host can create join points");
+                    return;
+                }
+                if (server.worldData.tryStartJoinPointCreation() != null)
+                    broadcastNotice("creating a join point");
+                else
+                    reply("a join point is already being created");
+            }
+            default -> reply("unknown command " + cmd + " (try /help)");
+        }
+    }
+
+    /** Disconnect a player with a reason they can display; the close follows on the next net tick. */
+    private void kick(ServerPlayer target, MpDisconnectReason reason) {
+        MpLog.info("kicking " + target.username() + ": " + reason);
+        target.conn.send(Packets.SERVER_DISCONNECT, ServerJoiningState.disconnect(reason, null));
+        server.queue.enqueue(() -> target.conn.close(reason, "kicked"));
+    }
+
+    private void reply(String text) {
+        ByteWriter w = new ByteWriter();
+        w.writeString(text);
+        connection.send(Packets.SERVER_NOTIFICATION, w);
+    }
+
+    private void broadcastNotice(String text) {
+        MpLog.info(text);
+        ByteWriter w = new ByteWriter();
+        w.writeString(text);
+        byte[] out = w.toArray();
+        for (ServerPlayer p : server.playerManager.playingPlayers())
+            p.conn.send(Packets.SERVER_NOTIFICATION, out);
     }
 
     private void broadcastFreeze() {

@@ -63,6 +63,10 @@ public final class MpPanel extends InterGui {
             protected void clickA() {
                 ServerSettings settings = new ServerSettings();
                 settings.port = MpSettings.port();
+                settings.password = MpSettings.get("password", "");
+                settings.maxPlayers = MpSettings.getInt("maxPlayers", 8);
+                settings.pauseOnJoin = MpSettings.getInt("pauseOnJoin", 1) != 0;
+                settings.gameName = MpSettings.get("gameName", MpSettings.defaultUsername() + "'s game");
                 HostUtil.hostServer(MpSettings.defaultUsername(), settings);
             }
         };

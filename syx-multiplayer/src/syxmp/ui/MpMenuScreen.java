@@ -47,6 +47,9 @@ public final class MpMenuScreen {
     private final GInput nameInput;
     private final GInput addressInput;
     private final GInput portInput;
+    private final GInput passwordInput;
+    private final GInput maxPlayersInput;
+    private boolean pauseOnJoin = true;
     private final GuiSection friends = new GuiSection();
     private final GText status = new GText(UI.FONT().M, 160);
     private final GText hint = new GText(UI.FONT().M, 200);
@@ -77,6 +80,15 @@ public final class MpMenuScreen {
         port.text().add(Integer.toString(MpSettings.port()));
         portInput = new GInput(port);
 
+        StringInputSprite pw = new StringInputSprite(32, UI.FONT().M).placeHolder("password (optional)");
+        pw.text().add(MpSettings.get("password", ""));
+        passwordInput = new GInput(pw);
+
+        StringInputSprite maxp = new StringInputSprite(2, UI.FONT().M).placeHolder("8");
+        maxp.text().add(Integer.toString(MpSettings.getInt("maxPlayers", 8)));
+        maxPlayersInput = new GInput(maxp);
+        pauseOnJoin = MpSettings.getInt("pauseOnJoin", 1) != 0;
+
         GuiSection form = new GuiSection();
         form.add(label("username"), 0, 0);
         form.addRightC(12, nameInput);
@@ -86,6 +98,25 @@ public final class MpMenuScreen {
         row2.addRightC(16, label("port"));
         row2.addRightC(12, portInput);
         form.addDown(12, row2);
+        // Host settings (the password doubles as the join password).
+        GuiSection row3 = new GuiSection();
+        row3.add(label("password"), 0, 0);
+        row3.addRightC(12, passwordInput);
+        row3.addRightC(16, label("max players"));
+        row3.addRightC(12, maxPlayersInput);
+        CLICKABLE pause = new util.gui.misc.GButt.Checkbox("pause when someone joins") {
+            @Override
+            protected void renAction() {
+                selectedSet(pauseOnJoin);
+            }
+
+            @Override
+            protected void clickA() {
+                pauseOnJoin = !pauseOnJoin;
+            }
+        };
+        row3.addRightC(16, pause);
+        form.addDown(12, row3);
 
         // --- actions ------------------------------------------------------
         GuiSection buttons = new GuiSection();
@@ -175,10 +206,40 @@ public final class MpMenuScreen {
         }
     }
 
+    public String password() {
+        return passwordInput.text().toString().trim();
+    }
+
+    public int maxPlayers() {
+        try {
+            return Math.max(2, Math.min(64, Integer.parseInt(maxPlayersInput.text().toString().trim())));
+        } catch (NumberFormatException e) {
+            return 8;
+        }
+    }
+
+    public boolean pauseOnJoin() {
+        return pauseOnJoin;
+    }
+
+    /** Server settings from the form (host side). */
+    public syxmp.server.ServerSettings serverSettings() {
+        syxmp.server.ServerSettings settings = new syxmp.server.ServerSettings();
+        settings.port = port();
+        settings.password = password();
+        settings.maxPlayers = maxPlayers();
+        settings.pauseOnJoin = pauseOnJoin();
+        settings.gameName = MpSettings.get("gameName", username() + "'s game");
+        return settings;
+    }
+
     public void saveInputs() {
         MpSettings.set("username", username());
         MpSettings.set("address", addressInput.text().toString().trim());
         MpSettings.set("port", Integer.toString(port()));
+        MpSettings.set("password", password());
+        MpSettings.set("maxPlayers", Integer.toString(maxPlayers()));
+        MpSettings.set("pauseOnJoin", pauseOnJoin ? "1" : "0");
         MpSettings.save();
     }
 
@@ -200,7 +261,7 @@ public final class MpMenuScreen {
             return;
         }
         MpLog.info("menu join " + address + ":" + port + " as " + username());
-        ClientConnect.connect(address, port, username(), "");
+        ClientConnect.connect(address, port, username(), password());
     }
 
     // --- friends list -----------------------------------------------------
@@ -277,8 +338,8 @@ public final class MpMenuScreen {
                 status.normalify();
             status.render(r, MenuScreen.inner.x1() + 20, MenuScreen.inner.y2() - 60);
         }
-        hint.clear().add("friends can join through the steam overlay while you host; "
-                + "direct joins need the port open or forwarded");
+        hint.clear().add("direct joins need the port open or forwarded; in game: Enter opens chat, "
+                + "/help lists host commands (/kick, /joinpoint)");
         hint.color(LABEL);
         hint.render(r, MenuScreen.inner.x1() + 20, MenuScreen.inner.y2() - 32);
     }

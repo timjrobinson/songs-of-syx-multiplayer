@@ -49,6 +49,11 @@ public final class PatchTable {
     public static final int HOOK_BATTLE_UNPAUSE = 16;
     /** Dev: entity update tracing (hooks only with -Dsyxmp.enttrace=1). */
     public static final int HOOK_ENT_UPDATE = 17;
+    /** GameSaver.autoSave: wall-clock autosave never fires in MP (stalls one client, writes host-side). */
+    public static final int HOOK_AUTOSAVE = 18;
+    /** GAME.Warn / GAME.Error branch on the local DEVELOPER/DEBUG launcher flags: uniform in MP. */
+    public static final int HOOK_GAME_WARN = 19;
+    public static final int HOOK_GAME_ERROR = 20;
 
     // Sync-method hooks (bound to SyncMethod handlers by SyxSync) start at 100.
     public static final int HOOK_IMMIGRATION_ADMIT = 100;
@@ -100,6 +105,34 @@ public final class PatchTable {
         // Battle AI worker threads run for every game in vanilla; in MP their
         // jobs run synchronously from the sub-step instead (BattleSync).
         t.hooks.add(new EntryHook("game/battle/thread/BattleThreads", "unpause", "(Z)V", HOOK_BATTLE_UNPAUSE));
+
+        // Local-only state the sim must not read: autosave (wall-clock, one
+        // client), GAME.Warn/Error (pause/throw depending on the local
+        // launcher flags; both test homes run DEVELOPER=1, players run 0).
+        t.hooks.add(new EntryHook("game/save/GameSaver", "autoSave", "(D)V", HOOK_AUTOSAVE));
+        t.hooks.add(new EntryHook("game/GAME", "Warn", "(Ljava/lang/String;)V", HOOK_GAME_WARN));
+        t.hooks.add(new EntryHook("game/GAME", "Error", "(Ljava/lang/String;)V", HOOK_GAME_ERROR));
+
+        // The battle VIEW gates simulation: GAME.java:260 skips every
+        // non-battle GameResource while the local battle view is open, and
+        // births, equipment drops, entry, disease and weather consult it too
+        // (StatsReproduction.java:221, Humanoid.java:443, SENTRY.java:42,
+        // EntryUpdater.java:48/97, disease/Updater.java:27, WeatherMoisture
+        // .java:87, SETT.java:706/730, GCOUNTS.java:220). One player opening
+        // the view would fork the sims; in MP the sim always sees it closed.
+        for (String cls : new String[] {
+                "game/GAME", "game/values/GCOUNTS", "settlement/entity/humanoid/Humanoid",
+                "settlement/entry/SENTRY", "settlement/entry/EntryUpdater", "settlement/main/SETT",
+                "settlement/weather/WeatherMoisture", "settlement/stats/disease/Updater",
+                "settlement/stats/colls/StatsReproduction", "world/battle/WBattles"})
+            t.redirects.add(new CallRedirect(cls, null,
+                    "view/battle/BattleView", "isActive", "()Z",
+                    "syxmp/client/Determinism", "battleViewActive"));
+        // WBattles.canPoll (WBattles.java:105) also waits for the local
+        // world-battle prompt to close before resolving sieges.
+        t.redirects.add(new CallRedirect("world/battle/WBattles", null,
+                "view/world/ui/battle/UIWBattlePrompt", "isBusty", "()Z",
+                "syxmp/client/Determinism", "worldBattlePromptBusy"));
 
         // Sim code that reads the local room-placement staging layer.
         for (String cls : new String[] {

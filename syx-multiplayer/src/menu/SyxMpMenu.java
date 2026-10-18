@@ -16,7 +16,6 @@ import syxmp.client.HostUtil;
 import syxmp.client.MainThread;
 import syxmp.server.ServerSettings;
 import syxmp.ui.MpMenuScreen;
-import syxmp.ui.MpSettings;
 import syxmp.util.MpLog;
 
 /**
@@ -82,19 +81,16 @@ public final class SyxMpMenu implements SC {
 
     private void hostSave(Path save) {
         String user = screen.username();
-        int port = screen.port();
-        MpLog.info("hosting save " + save + " on port " + port + " as " + user);
+        ServerSettings settings = screen.serverSettings();
+        MpLog.info("hosting save " + save + " on port " + settings.port + " as " + user
+                + (settings.hasPassword() ? " (password)" : "") + " max " + settings.maxPlayers
+                + " pauseOnJoin " + settings.pauseOnJoin);
         menu.start(new GameLoader(save) {
             @Override
             public void doAfterSet() {
                 // Host on the first frame of the loaded game (updater thread,
                 // game fully constructed), not inside the state switch.
-                MainThread.enqueue(() -> {
-                    ServerSettings settings = new ServerSettings();
-                    settings.port = port;
-                    settings.gameName = MpSettings.get("gameName", user + "'s game");
-                    HostUtil.hostServer(user, settings);
-                });
+                MainThread.enqueue(() -> HostUtil.hostServer(user, settings));
             }
         });
     }

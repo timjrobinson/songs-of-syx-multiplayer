@@ -46,6 +46,25 @@ public final class Determinism {
         return map.is(tile);
     }
 
+    /**
+     * Replaces {@code VIEW.b().isActive()} inside simulation classes (see
+     * PatchTable). The battle view is local UI; in multiplayer the shared
+     * simulation always behaves as if it were closed, so a player opening it
+     * does not pause the settlement resources on their machine only.
+     */
+    public static boolean battleViewActive(view.battle.BattleView b) {
+        if (Multiplayer.active())
+            return false;
+        return b.isActive();
+    }
+
+    /** Replaces {@code VIEW.world().UI.battle.isBusty()} in WBattles.canPoll. */
+    public static boolean worldBattlePromptBusy(view.world.ui.battle.UIWBattlePrompt p) {
+        if (Multiplayer.active())
+            return false;
+        return p.isBusty();
+    }
+
     public static boolean embryoIs(MAP_BOOLEAN map, int tx, int ty) {
         if (Multiplayer.active() && map == SETT.ROOMS().placement.embryo)
             return false;
