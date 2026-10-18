@@ -37,7 +37,11 @@ public final class SaveTransfer {
 
     /** Set by the script when a fresh SCRIPT_INSTANCE is created for a new GAME. */
     public static volatile boolean newGameCreated;
+    /** Number of games created in this process (script instances). */
+    public static volatile int gamesCreated;
     private static Runnable pendingAfterLoad;
+    private static byte[] lastApplied;
+    private static boolean warmupDone;
 
     /**
      * Called on the first frame of every game update while reloading: once
@@ -48,8 +52,21 @@ public final class SaveTransfer {
     public static void finishReloadIfPending() {
         if (!Multiplayer.reloading || !newGameCreated)
             return;
-        Multiplayer.reloading = false;
         newGameCreated = false;
+        // First game in this process? Load once more: the game's process-level
+        // singletons come into being during the first game and later games
+        // reuse them, so a first-game client is not equivalent to one that
+        // has had a game before (menu joiners desynced where in-game joiners
+        // did not). The warm-up load makes every client a "second game".
+        if (!warmupDone && gamesCreated <= 1 && lastApplied != null) {
+            warmupDone = true;
+            MpLog.info("first game in this process: warm-up load done, loading again");
+            Runnable r = pendingAfterLoad;
+            apply(lastApplied, r);
+            return;
+        }
+        warmupDone = true;
+        Multiplayer.reloading = false;
         try {
             view.main.VIEW.inters().load.deactivate();
         } catch (RuntimeException e) {
@@ -154,6 +171,7 @@ public final class SaveTransfer {
             Multiplayer.reloading = true;
             pendingAfterLoad = afterLoad == null ? () -> { } : afterLoad;
             newGameCreated = false;
+            lastApplied = saveBytes;
             new GameLoader(file).set();
             MpLog.info("loading received state (" + saveBytes.length + "b)");
         } catch (Exception e) {

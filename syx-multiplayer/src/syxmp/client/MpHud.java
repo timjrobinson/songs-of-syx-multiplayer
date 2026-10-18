@@ -51,10 +51,11 @@ public final class MpHud {
             sb.append(" | speed ").append(TickController.speed);
             sb.append(" | players ").append(Math.max(1, session.players.size()));
             synchronized (ClientPlayingState.ChatLog.class) {
-                int i = 0;
-                for (String line : ClientPlayingState.ChatLog.lines) {
-                    if (++i > ClientPlayingState.ChatLog.lines.size() - 3)
-                        sb.append("  ||  ").append(line);
+                String last = ClientPlayingState.ChatLog.lines.peekLast();
+                if (last != null) {
+                    if (last.length() > 70)
+                        last = last.substring(0, 67) + "...";
+                    sb.append("  |  ").append(last);
                 }
             }
             String status = sb.toString();

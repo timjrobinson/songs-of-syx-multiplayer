@@ -88,6 +88,7 @@ public class SyxMultiplayer implements SCRIPT {
     public SCRIPT_INSTANCE createInstance() {
         MpLog.info("createInstance");
         syxmp.client.SaveTransfer.newGameCreated = true;
+        syxmp.client.SaveTransfer.gamesCreated++;
         return new Instance();
     }
 
