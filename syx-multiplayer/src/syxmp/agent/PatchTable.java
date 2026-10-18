@@ -39,6 +39,8 @@ public final class PatchTable {
     public static final int HOOK_PATH_PREP = 11;
     /** Dev: RND draw tracing (hooks only installed with -Dsyxmp.rndtrace=1). */
     public static final int HOOK_RND_DRAW = 12;
+    /** GameLoader.getState entry: deterministic RND seed for game construction in MP. */
+    public static final int HOOK_GAME_LOAD = 13;
 
     // Sync-method hooks (bound to SyncMethod handlers by SyxSync) start at 100.
     public static final int HOOK_IMMIGRATION_ADMIT = 100;
@@ -103,6 +105,14 @@ public final class PatchTable {
                     "syxmp/client/Determinism", "embryoIs"));
         }
 
+        // Game construction/loading consumes RND for unsaved cosmetic state
+        // (e.g. TForest sprite animators seed speeds from RND and keep
+        // drawing inside the sim tick). Seeding before every MP load makes
+        // that state identical on all clients (they all load the same blob
+        // at the same timer).
+        t.hooks.add(new EntryHook("game/save/GameLoader", "getState", "()Lsnake2d/CORE_STATE;",
+                HOOK_GAME_LOAD));
+
         // Dev-only RND call-site tracing (zero cost unless enabled: hooks absent).
         if ("1".equals(System.getProperty("syxmp.rndtrace"))) {
             String[][] rnd = {
@@ -133,6 +143,11 @@ public final class PatchTable {
         t.hooks.add(new EntryHook("view/menu/IMenu", "exit2Menu", "()V", HOOK_EXIT_TO_MENU));
         t.hooks.add(new EntryHook("view/main/VIEW", "update", "(FD)V", HOOK_VIEW_UPDATE));
         t.hooks.add(new EntryHook("view/main/VIEW", "render", "(Lsnake2d/Renderer;F)V", HOOK_VIEW_RENDER));
+
+        // Generic setter sync (AutoSyncTable): one hook id per entry.
+        for (int i = 0; i < AutoSyncTable.METHODS.length; i++)
+            t.hooks.add(new EntryHook(AutoSyncTable.owner(i), AutoSyncTable.name(i),
+                    AutoSyncTable.desc(i), AutoSyncTable.FIRST_HOOK_ID + i));
 
         // Synced player verbs (see SyxSync.registerAll for the wire handlers).
         t.hooks.add(new EntryHook("settlement/entry/Immigration", "admit",

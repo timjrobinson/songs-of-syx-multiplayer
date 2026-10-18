@@ -45,6 +45,15 @@ public final class DevAuto {
 
     /** Called every in-game frame from TickController.gameUpdate. */
     public static void gameTick() {
+        if (AUTOLOAD != null && !Multiplayer.reloading) {
+            // Unattended runs: dismiss the "CLICK TO CONTINUE" screen ourselves.
+            try {
+                if (view.main.VIEW.inters().load.isActivated())
+                    view.main.VIEW.inters().load.deactivate();
+            } catch (RuntimeException e) {
+                // no view yet
+            }
+        }
         if (AUTOHOST == null && AUTOJOIN == null)
             return;
         gameFrames++;

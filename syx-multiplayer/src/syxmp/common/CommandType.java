@@ -16,7 +16,9 @@ public enum CommandType {
     /** int syncId + serialized args — the workhorse: a synced player action. */
     SYNC,
     /** dev-mode tool invocation. */
-    DEBUG_TOOLS;
+    DEBUG_TOOLS,
+    /** string methodKey + string targetPath + args — generic setter sync (AutoSync). */
+    SYNC_AUTO;
 
     private static final CommandType[] VALUES = values();
 

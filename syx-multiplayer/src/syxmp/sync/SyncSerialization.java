@@ -74,6 +74,18 @@ public final class SyncSerialization {
         });
     }
 
+    /** The registered worker type for a runtime class (itself or a supertype/interface), or null. */
+    public static Class<?> workerFor(Class<?> runtime) {
+        for (Class<?> c = runtime; c != null; c = c.getSuperclass()) {
+            if (workers.containsKey(c))
+                return c;
+            for (Class<?> i : c.getInterfaces())
+                if (workers.containsKey(i))
+                    return i;
+        }
+        return null;
+    }
+
     public static boolean canHandle(Class<?> type) {
         return workers.containsKey(type) || type.isEnum();
     }

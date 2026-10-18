@@ -220,6 +220,16 @@ public final class TickController {
         }
     }
 
+    /** Deterministic RND state for game construction during a multiplayer load. */
+    public static void seedForLoad() {
+        MultiplayerSession session = Multiplayer.session;
+        if (session == null)
+            return;
+        int seed = mixSeed(session.rngSeed ^ 0x6C0AD5EEDL, timer);
+        RND.setSeed(seed);
+        MpLog.info("seeded RND for load at timer " + timer);
+    }
+
     public static int mixSeed(long sessionSeed, int tick) {
         long z = sessionSeed + 0x9E3779B97F4A7C15L * (tick + 1);
         z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;

@@ -1,3 +1,76 @@
+# Session handoff — 2026-10-18 (session 2)
+
+State of the Syx Multiplayer project. Read `CLAUDE.md` first, then this.
+(The 2026-08-21 session-1 notes follow below; everything in this section
+supersedes them where they conflict.)
+
+## What works now (verified live, two real game instances)
+
+- **Join end to end**: host from a loaded save (menu or in-game), joiner over
+  TCP: handshake → join point (every client, host included, saves+reloads at
+  the same tick, clock frozen meanwhile — RW semantics) → world download
+  (4MB) → load → catch-up → `world ready` → lockstep. Speed changes from
+  either side are synced commands executed at the same tick on both.
+- **UI**: main-menu "multiplayer" screen (host a saved game / join by
+  address+port / Steam friends list), escape-menu "multiplayer" entry,
+  in-game panel (status, players+latency, chat, host/leave/pause), HUD status
+  line (click to open panel), Enter opens chat, remote player cursors on the
+  map, join/leave notices.
+- **Steam** (implemented, NOT yet testable here — Steam isn't running on the
+  dev box): friends-only lobby + rich presence `connect` when hosting,
+  friends-hosting list in the menu, join via lobby owner over ISteamNetworking
+  P2P (`syxmp.steam.*`). steamworks4j + natives ship in the game jar; the game
+  never inits SteamAPI in-process, so the mod owns it. App id 1162750. To
+  test from a terminal launch, Steam must run and `steam_appid.txt`
+  (1162750) must exist in the game dir.
+- **Determinism catalogue so far**: fixed 1/16s sub-steps driven by the
+  lockstep clock; RND reseeded per sub-step and per command; per-frame
+  `GAME.afterTick()` moved into the lockstep loop (it does real sim work:
+  maintenance consumption grid, world battle polling); pathfinder forced to
+  its synchronous branch; room-placement staging layer (`PLACEMENT.embryo`)
+  hidden from sim readers; sub-step accumulator saved; RND seeded
+  deterministically at every MP game load (unsaved cosmetic state such as
+  `TForest` sprite animators is initialized from RND and keeps drawing inside
+  the sim tick — first desync found by the RND trace).
+- **Generic setter sync (`AutoSync`)**: `AutoSyncTable` lists sim setters
+  (IntImp.set, BOOLEANImp.set, room employment priorities, immigration...);
+  UI-context calls are sent as `SYNC_AUTO` commands addressing the target by
+  its **object path** from static roots (`ObjectPaths`, anchors for
+  entities/rooms). Unsyncable calls are logged `UNSYNCED (local only)`.
+
+## Dev tooling (all off by default)
+
+- `syx-multiplayer/e2e/run-pair.sh [jvm args]` — host + joiner, windowed side
+  by side on the 4K monitor, autoload/autohost/autojoin/autounpause, logs in
+  `e2e/logs/`. `kill-games.sh` waits for instances to exit (ports!).
+- `-Dsyxmp.rndtrace=1` → `<logs>/syxmp-rnd.txt` per client: every RND draw's
+  call site per sub-step (restarted at each join-point reload so both files
+  align). `e2e/difftrace.sh` diffs host vs joiner from the first common
+  sub-step — the first differing line IS the desync cause.
+- `-Dsyxmp.trace=1` → `<logs>/syxmp-verbs.txt`: first UI-context call of
+  every candidate sim method with call chain (player-verb discovery).
+- Chat `/hash` → every client logs per-savable state hashes
+  (`[SyxMP:hash]`), diff to find the diverged subsystem.
+- Launcher settings in both homes set to windowed 1920x1080
+  (SCREEN_MODE 2, WINDOW_WIDTH/HEIGHT 10, WIN_AUTO_ICONIFY 0).
+- `build.sh` installs the jar atomically (rename) into both the real mods dir
+  and `.mp-test-home` — safe while instances run.
+
+## Next steps, in order
+
+1. Desync loop: run the pair with `-Dsyxmp.rndtrace=1`, `difftrace.sh`,
+   patch the cause (route cosmetic RND to a separate stream via CallRedirect
+   of `RND.*` in that class, or seed/save state), repeat until a 10-minute
+   soak at speed 1 and 5 stays in sync.
+2. Verb coverage: play with `-Dsyxmp.trace=1`, add discovered setters to
+   `AutoSyncTable`; tools/placement (`PlacableMultiTool.place` with area
+   bitmap + `Placer` identity via object path), `RoomPlacer.create()` with a
+   staging snapshot, one-offs (Deal.execute, PTech.levelSet, army orders...).
+3. Steam live test (needs Steam running), then desync dialog/report bundle,
+   battles (BattleThreads), protocol/version discipline, workshop packaging.
+
+---
+
 # Session handoff — 2026-08-21
 
 State of the Syx Multiplayer project at the end of the first build session, for

@@ -64,6 +64,8 @@ public final class Hooks {
             return false;
         });
 
+        syxmp.sync.AutoSync.install();
+
         MpLog.info("entry hooks installed");
     }
 }

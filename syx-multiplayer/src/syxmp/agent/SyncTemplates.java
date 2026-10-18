@@ -20,7 +20,7 @@ public final class SyncTemplates {
         boolean invoke(Object self, Object[] args);
     }
 
-    private static final int MAX_HOOKS = 1024;
+    private static final int MAX_HOOKS = 4096;
     private static final EntryHandler[] handlers = new EntryHandler[MAX_HOOKS];
 
     private SyncTemplates() {

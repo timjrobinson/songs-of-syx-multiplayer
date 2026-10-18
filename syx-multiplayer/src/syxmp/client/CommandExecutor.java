@@ -41,6 +41,7 @@ public final class CommandExecutor {
                     // Per-player permissions etc.; nothing synced yet
                 }
                 case SYNC -> Sync.handleSyncCommand(data);
+                case SYNC_AUTO -> syxmp.sync.AutoSync.execute(data);
                 case DEBUG_TOOLS -> {
                     int tool = data.readByte();
                     if (tool == 0)

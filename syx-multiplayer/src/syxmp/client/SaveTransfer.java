@@ -58,6 +58,7 @@ public final class SaveTransfer {
         Runnable r = pendingAfterLoad;
         pendingAfterLoad = null;
         syxmp.desync.SyncCoordinator.reset();
+        syxmp.sync.ObjectPaths.invalidate();
         syxmp.dev.RndTrace.restart();
         syxmp.ui.MpCursors.clear();
         MpLog.info("state loaded; game recreated at timer " + TickController.timer);
