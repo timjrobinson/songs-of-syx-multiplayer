@@ -218,7 +218,7 @@ public final class PatchTable {
         // Render helpers constructed lazily (first game in the process only)
         // and sprite classes: e.g. settlement.battle.BannerRenderer draws 4
         // times in its constructor — only on the client whose first game it is.
-        "*Renderer*", "*Sprite*", "*Particle*", "*Anim*",
+        "*Renderer*", "*Sprite*", "*Particle*", "*Animation*",
         // Gore pools: 5000 cosmetic objects randomized at SETT construction.
         "settlement/thing/Gore*", "settlement/thing/ThingsGore",
     };
