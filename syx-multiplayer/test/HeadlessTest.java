@@ -34,11 +34,50 @@ public final class HeadlessTest {
     static int failures;
 
     public static void main(String[] args) throws Exception {
+        testAutoSyncTableResolves();
         testTransformerGameSpeed();
         testTransformerViewRedirect();
         testJoinFlowOverTcp();
         System.out.println(failures == 0 ? "ALL TESTS PASSED" : failures + " FAILURES");
         System.exit(failures == 0 ? 0 : 1);
+    }
+
+    /** Every AutoSyncTable entry must name a real declared method / field of the shipped game. */
+    static void testAutoSyncTableResolves() throws Exception {
+        System.out.println("AutoSyncTable resolution:");
+        int bad = 0;
+        for (String key : syxmp.agent.AutoSyncTable.METHODS) {
+            String[] parts = key.split(" ");
+            try {
+                Class<?> owner = Class.forName(parts[0].replace('/', '.'), false, HeadlessTest.class.getClassLoader());
+                boolean found = false;
+                for (java.lang.reflect.Method m : owner.getDeclaredMethods())
+                    if (m.getName().equals(parts[1]) && org.objectweb.asm.Type.getMethodDescriptor(m).equals(parts[2]))
+                        found = true;
+                if (!found) {
+                    bad++;
+                    System.out.println("  MISSING method: " + key);
+                }
+            } catch (Throwable t) {
+                bad++;
+                System.out.println("  MISSING class: " + key + " (" + t + ")");
+            }
+        }
+        for (String[] f : syxmp.agent.AutoSyncTable.FIELDS) {
+            try {
+                Class<?> owner = Class.forName(f[1].replace('/', '.'), false, HeadlessTest.class.getClassLoader());
+                java.lang.reflect.Field fld = owner.getDeclaredField(f[2]);
+                if (!org.objectweb.asm.Type.getDescriptor(fld.getType()).equals(f[3])) {
+                    bad++;
+                    System.out.println("  WRONG field desc: " + String.join(" ", f) + " is " + fld.getType());
+                }
+            } catch (Throwable t) {
+                bad++;
+                System.out.println("  MISSING field: " + String.join(" ", f) + " (" + t + ")");
+            }
+        }
+        check(bad == 0, "all " + syxmp.agent.AutoSyncTable.METHODS.length + " methods and "
+                + syxmp.agent.AutoSyncTable.FIELDS.length + " fields resolve");
     }
 
     static void check(boolean cond, String what) {

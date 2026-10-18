@@ -68,6 +68,14 @@ public final class PatchTable {
             String newName) {
     }
 
+    /**
+     * Inside classes matching inClass, rewrite PUTFIELD owner.name:desc into
+     * FieldSync.put*(receiver, value, "owner name desc") — UI code that
+     * assigns sim fields directly (no setter to hook).
+     */
+    public record FieldRedirect(String inClass, String owner, String name, String desc) {
+    }
+
     public record EntryHook(
             String owner,          // internal name, e.g. "game/GameSpeed"
             String name,
@@ -77,6 +85,7 @@ public final class PatchTable {
 
     public final List<CallRedirect> redirects = new ArrayList<>();
     public final List<EntryHook> hooks = new ArrayList<>();
+    public final List<FieldRedirect> fieldRedirects = new ArrayList<>();
 
     public static PatchTable build() {
         PatchTable t = new PatchTable();
@@ -233,12 +242,48 @@ public final class PatchTable {
             t.hooks.add(new EntryHook(AutoSyncTable.owner(i), AutoSyncTable.name(i),
                     AutoSyncTable.desc(i), AutoSyncTable.FIRST_HOOK_ID + i));
 
+        // UI call sites that write sim state through generic containers
+        // (RMapInt/ArrayInt/DataO/INT_OE setters are used everywhere in the
+        // sim, so they are redirected only inside the UI classes that use
+        // them for player settings; UiRedirects sends the call as SYNC_AUTO).
+        for (String ui : UI_GENERIC_SETTER_SITES) {
+            t.redirects.add(new CallRedirect(ui, null, "util/data/INT_O$INT_OE", "set", "(Ljava/lang/Object;I)V",
+                    "syxmp/sync/UiRedirects", "intOeSet"));
+            t.redirects.add(new CallRedirect(ui, null, "util/data/INT_O$INT_OE", "inc", "(Ljava/lang/Object;I)V",
+                    "syxmp/sync/UiRedirects", "intOeInc"));
+            t.redirects.add(new CallRedirect(ui, null, "util/data/DataO$DataAbs", "set", "(Ljava/lang/Object;I)V",
+                    "syxmp/sync/UiRedirects", "dataAbsSet"));
+            t.redirects.add(new CallRedirect(ui, null, "util/data/DataO$DataBit", "set", "(Ljava/lang/Object;I)V",
+                    "syxmp/sync/UiRedirects", "dataBitSet"));
+            t.redirects.add(new CallRedirect(ui, null, "util/keymap/RMapInt", "set", "(Lutil/keymap/MAPPED;I)V",
+                    "syxmp/sync/UiRedirects", "rMapIntSet"));
+            t.redirects.add(new CallRedirect(ui, null, "util/keymap/RMapInt", "set", "(Ljava/lang/Object;I)V",
+                    "syxmp/sync/UiRedirects", "rMapIntSetO"));
+            t.redirects.add(new CallRedirect(ui, null, "snake2d/util/sets/ArrayInt", "set", "(II)Lsnake2d/util/sets/ArrayInt;",
+                    "syxmp/sync/UiRedirects", "arrayIntSet"));
+        }
+
+        // Direct field assignments from UI code (AutoSyncTable.FIELDS).
+        for (String[] f : AutoSyncTable.FIELDS)
+            t.fieldRedirects.add(new FieldRedirect(f[0], f[1], f[2], f[3]));
+
         // Synced player verbs (see SyxSync.registerAll for the wire handlers).
         t.hooks.add(new EntryHook("settlement/entry/Immigration", "admit",
                 "(Linit/race/Race;I)V", HOOK_IMMIGRATION_ADMIT));
 
         return t;
     }
+
+    /** UI classes (prefix wildcards cover their anonymous inner classes) using generic setters on sim data. */
+    private static final String[] UI_GENERIC_SETTER_SITES = {
+        "view/sett/ui/standing/CatPopulationGrowth*",   // birth limit (RMapInt), forced breeding (ArrayInt)
+        "view/sett/ui/subject/UISubjectType*",          // favourite toggle (DataAbs)
+        "view/world/ui/region/PlayPop*",                // race edicts (DataBit via INT_OE)
+        "view/world/ui/region/Other*",                  // emissary assimilation (EmiType via INT_OE)
+        "view/world/ui/faction/Court*",                 // court flatter/sabotage/assassinate targets
+        "view/ui/UIEmissaries*",
+        "view/world/ui/army/Army*",                     // artillery supply target
+    };
 
     /** Classes whose RND use is purely cosmetic but runs inside the sim tick. */
     private static final String[] VISUAL_RND_CLASSES = {
@@ -286,6 +331,9 @@ public final class PatchTable {
 
     public boolean touches(String internalClassName) {
         for (CallRedirect r : redirects)
+            if (classMatches(r.inClass, internalClassName))
+                return true;
+        for (FieldRedirect r : fieldRedirects)
             if (classMatches(r.inClass, internalClassName))
                 return true;
         for (EntryHook h : hooks)

@@ -54,6 +54,16 @@ public final class TickController {
     /** Wall-clock budget per frame while fast-forwarding. */
     private static final long SIMULATE_BUDGET_MS = 40;
 
+    /**
+     * The vanilla paused frame (every GameResource.update(0) + updateI++)
+     * run per Timer unit while the synced speed is 0. OFF by default: pair
+     * runs with it desynced within ~20 sub-steps of the next unpause every
+     * time (maintenance tile updates diverged; see docs/HANDOFF3.md), runs
+     * without it stayed in sync. Kept for investigation.
+     */
+    private static final boolean PAUSED_STEP = "1".equals(System.getProperty("syxmp.pausedstep"));
+    private static final boolean NO_MIRROR = "1".equals(System.getProperty("syxmp.nomirror"));
+
     private TickController() {
     }
 
@@ -210,10 +220,11 @@ public final class TickController {
                 timeToTickThrough -= timePerTick;
                 runSubStep();
             }
-        } else {
+        } else if (PAUSED_STEP) {
             runPausedStep();
         }
-        mirrorVanillaSpeed();
+        if (!NO_MIRROR)
+            mirrorVanillaSpeed();
         timer++;
         if (timer % 600 == 0)
             MpLog.info("clock: timer=" + timer + "/" + tickUntil

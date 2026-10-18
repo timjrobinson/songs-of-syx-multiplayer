@@ -32,6 +32,8 @@ public final class AutoSync {
     private static final Map<String, Long> unsyncableLogged = new HashMap<>();
 
     private static final byte ARG_NULL = 0, ARG_PRIMITIVE = 1, ARG_WORKER = 2, ARG_PATH = 3;
+    /** Target string for static methods. */
+    private static final String STATIC_TARGET = "";
 
     private AutoSync() {
     }
@@ -48,18 +50,66 @@ public final class AutoSync {
     private static boolean onCall(int index, Object self, Object[] args) {
         if (!Multiplayer.shouldSync())
             return false;
-        String key = AutoSyncTable.METHODS[index];
-        String target = ObjectPaths.pathOf(self);
-        if (target == null) {
-            unsyncable(key, "target " + self.getClass().getName());
+        return send(AutoSyncTable.METHODS[index], self, args, paramTypes(index));
+    }
+
+    /**
+     * Redirected generic-setter call (UiRedirects): the key names the
+     * receiver's runtime class, which is what the executing side resolves.
+     * @return true if sent (caller must skip the local call).
+     */
+    public static boolean sendRuntime(Object self, String name, String desc, Object... args) {
+        if (!Multiplayer.shouldSync() || self == null)
             return false;
+        String key = self.getClass().getName().replace('.', '/') + " " + name + " " + desc;
+        Class<?>[] types;
+        try {
+            types = method(key).getParameterTypes();
+        } catch (ReflectiveOperationException e) {
+            unsyncable(key, "method not found: " + e);
+            return false;
+        }
+        return send(key, self, args, types);
+    }
+
+    /** Field assignment from UI code (FieldSync). @return true if sent. */
+    public static boolean sendField(String fieldKey, Object self, Object value) {
+        Class<?> type;
+        try {
+            type = FieldSync.field(fieldKey).getType();
+        } catch (ReflectiveOperationException e) {
+            unsyncable(fieldKey, "field not found: " + e);
+            return false;
+        }
+        return send(FIELD_PREFIX + fieldKey, self, new Object[] {value}, new Class<?>[] {type});
+    }
+
+    private static final String FIELD_PREFIX = "field ";
+
+    private static boolean send(String key, Object self, Object[] args, Class<?>[] types) {
+        String target;
+        if (self == null) {
+            target = STATIC_TARGET; // static method: no receiver to address
+        } else {
+            target = ObjectPaths.pathOf(self);
+            if (target == null) {
+                unsyncable(key, "target " + self.getClass().getName());
+                return false;
+            }
         }
         ByteWriter w = new ByteWriter(128);
         w.writeString(key);
         w.writeString(target);
-        Class<?>[] types = paramTypes(index);
         for (int i = 0; i < args.length; i++) {
             if (!writeArg(w, types[i], args[i])) {
+                // A java.lang.Object parameter carrying a UI token (e.g. the
+                // button that RoomInstance.remove records as the area user)
+                // has no sim meaning; the receiver gets null.
+                if (types[i] == Object.class && args[i] != null
+                        && args[i].getClass().getName().startsWith("view.")) {
+                    w.writeByte(ARG_NULL);
+                    continue;
+                }
                 unsyncable(key, "arg " + i + " " + (args[i] == null ? "null" : args[i].getClass().getName()));
                 return false;
             }
@@ -127,18 +177,37 @@ public final class AutoSync {
         String key = data.readString(512);
         String target = data.readString(4096);
         try {
+            if (key.startsWith(FIELD_PREFIX)) {
+                String fieldKey = key.substring(FIELD_PREFIX.length());
+                Class<?> type = FieldSync.field(fieldKey).getType();
+                Object value = readArg(data, type);
+                Object self = ObjectPaths.resolve(target);
+                if (self == null) {
+                    MpLog.err("auto-sync field target gone: " + target + " for " + key);
+                    return;
+                }
+                FieldSync.write(self, value, fieldKey);
+                return;
+            }
             Method m = method(key);
             Class<?>[] types = m.getParameterTypes();
             Object[] args = new Object[types.length];
             for (int i = 0; i < types.length; i++)
                 args[i] = readArg(data, types[i]);
-            Object self = ObjectPaths.resolve(target);
-            if (self == null) {
-                MpLog.err("auto-sync target gone: " + target + " for " + key);
-                return;
+            Object self = null;
+            if (!target.equals(STATIC_TARGET)) {
+                self = ObjectPaths.resolve(target);
+                if (self == null) {
+                    MpLog.err("auto-sync target gone: " + target + " for " + key);
+                    return;
+                }
             }
             m.setAccessible(true);
-            m.invoke(self, args);
+            Object ret = m.invoke(self, args);
+            // RoomInstance.remove hands back the shared TmpArea for the caller
+            // to release (UIRoom.java:347); the UI's own call was cancelled.
+            if (ret instanceof settlement.room.main.TmpArea area)
+                area.clear();
         } catch (ReflectiveOperationException | RuntimeException e) {
             MpLog.err("auto-sync execution failed for " + key + " on " + target, e);
         }
@@ -154,7 +223,17 @@ public final class AutoSync {
         Class<?>[] params = new Class<?>[argTypes.length];
         for (int i = 0; i < argTypes.length; i++)
             params[i] = classOf(argTypes[i]);
-        m = owner.getDeclaredMethod(parts[1], params);
+        NoSuchMethodException missing = null;
+        for (Class<?> c = owner; c != null && m == null; c = c.getSuperclass()) {
+            try {
+                m = c.getDeclaredMethod(parts[1], params);
+            } catch (NoSuchMethodException e) {
+                missing = e;
+            }
+        }
+        if (m == null)
+            throw missing != null ? missing : new NoSuchMethodException(key);
+        m.setAccessible(true);
         methods.put(key, m);
         return m;
     }

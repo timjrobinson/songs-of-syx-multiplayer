@@ -138,8 +138,13 @@ public final class MpTransformer implements ClassFileTransformer {
                 if (PatchTable.classMatches(r.inClass(), className)
                         && (r.inMethod() == null || r.inMethod().equals(name)))
                     redirects.add(r);
-            if (!redirects.isEmpty())
-                mv = new RedirectingMethodVisitor(mv, redirects, this);
+            List<PatchTable.FieldRedirect> fieldRedirects = new ArrayList<>();
+            if (!name.equals("<init>") && !name.equals("<clinit>"))
+                for (PatchTable.FieldRedirect r : table.fieldRedirects)
+                    if (PatchTable.classMatches(r.inClass(), className))
+                        fieldRedirects.add(r);
+            if (!redirects.isEmpty() || !fieldRedirects.isEmpty())
+                mv = new RedirectingMethodVisitor(mv, redirects, fieldRedirects, this);
 
             for (PatchTable.EntryHook h : table.hooks)
                 if (h.owner().equals(className) && h.name().equals(name) && h.desc().equals(desc)) {
@@ -176,12 +181,42 @@ public final class MpTransformer implements ClassFileTransformer {
     /** Rewrites matching virtual calls into static calls with the receiver prepended. */
     private static final class RedirectingMethodVisitor extends MethodVisitor {
         private final List<PatchTable.CallRedirect> redirects;
+        private final List<PatchTable.FieldRedirect> fieldRedirects;
         private final PatchingVisitor pv;
 
-        RedirectingMethodVisitor(MethodVisitor mv, List<PatchTable.CallRedirect> redirects, PatchingVisitor pv) {
+        RedirectingMethodVisitor(MethodVisitor mv, List<PatchTable.CallRedirect> redirects,
+                List<PatchTable.FieldRedirect> fieldRedirects, PatchingVisitor pv) {
             super(Opcodes.ASM9, mv);
             this.redirects = redirects;
+            this.fieldRedirects = fieldRedirects;
             this.pv = pv;
+        }
+
+        /** PUTFIELD owner.name -> FieldSync.put*(receiver, value, "owner name desc"). */
+        @Override
+        public void visitFieldInsn(int opcode, String owner, String name, String desc) {
+            if (opcode == Opcodes.PUTFIELD) {
+                for (PatchTable.FieldRedirect r : fieldRedirects) {
+                    if (!owner.equals(r.owner()) || !name.equals(r.name()) || !desc.equals(r.desc()))
+                        continue;
+                    pv.changed = true;
+                    pv.changedBeyondClinit = true;
+                    super.visitLdcInsn(owner + " " + name + " " + desc);
+                    String m;
+                    String vdesc;
+                    switch (desc.charAt(0)) {
+                        case 'Z', 'B', 'C', 'S', 'I' -> { m = "putI"; vdesc = "I"; }
+                        case 'J' -> { m = "putJ"; vdesc = "J"; }
+                        case 'F' -> { m = "putF"; vdesc = "F"; }
+                        case 'D' -> { m = "putD"; vdesc = "D"; }
+                        default -> { m = "putA"; vdesc = "Ljava/lang/Object;"; }
+                    }
+                    super.visitMethodInsn(Opcodes.INVOKESTATIC, "syxmp/sync/FieldSync", m,
+                            "(Ljava/lang/Object;" + vdesc + "Ljava/lang/String;)V", false);
+                    return;
+                }
+            }
+            super.visitFieldInsn(opcode, owner, name, desc);
         }
 
         @Override

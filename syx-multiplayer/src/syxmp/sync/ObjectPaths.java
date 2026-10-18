@@ -31,12 +31,16 @@ import syxmp.util.MpLog;
  */
 public final class ObjectPaths {
 
-    private static final int MAX_DEPTH = 9;
+    private static final int MAX_DEPTH = 12;
     private static final int MAX_OBJECTS = 400_000;
     private static final int MAX_ELEMENTS = 512;
     private static final String[] ROOTS = {
         "settlement.main.SETT", "game.GAME", "game.faction.FACTIONS", "world.WORLD",
         "init.race.RACES", "init.resources.RESOURCES", "settlement.stats.STATS",
+        // singletons kept in private statics outside the big roots
+        "settlement.entity.humanoid.ai.types.prisoner.AIModule_Prisoner",
+        "game.faction.diplomacy.DIP", "game.faction.royalty.opinion.ROPINION",
+        "world.region.RD", "game.events.EVENTS", "game.nobility.NOBLES",
     };
     private static final String[] SKIP_PACKAGES = {
         "java.", "javax.", "sun.", "jdk.", "org.lwjgl", "snake2d.", "syxmp.", "init.sprite",
