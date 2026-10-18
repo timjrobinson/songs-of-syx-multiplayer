@@ -66,3 +66,7 @@ install_to() {
 install_to "$MODS_DIR"
 TEST_HOME="$PROJ/.mp-test-home/.local/share/songsofsyx/mods"
 [[ -d "$TEST_HOME" ]] && install_to "$TEST_HOME"
+# Steam runs the game through Proton on this machine: its data lives in the prefix.
+PROTON_MODS="/mnt/games/SteamLibrary/steamapps/compatdata/1162750/pfx/drive_c/users/steamuser/AppData/Roaming/songsofsyx/mods"
+[[ -d "$PROTON_MODS" ]] && install_to "$PROTON_MODS"
+true
