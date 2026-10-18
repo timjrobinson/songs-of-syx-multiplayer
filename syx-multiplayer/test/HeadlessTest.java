@@ -35,12 +35,53 @@ public final class HeadlessTest {
 
     public static void main(String[] args) throws Exception {
         testAutoSyncTableResolves();
+        testCallRedirectsResolve();
         testTransformerGameSpeed();
         testTransformerViewRedirect();
         testFieldAndUiRedirects();
+        testBattleOrderHooks();
+        testWorldBattleRedirects();
+        testBattleOrderCodec();
         testJoinFlowOverTcp();
         System.out.println(failures == 0 ? "ALL TESTS PASSED" : failures + " FAILURES");
         System.exit(failures == 0 ? 0 : 1);
+    }
+
+    /** Every CallRedirect's replacement must exist as a static method with the descriptor the transformer emits
+     *  (receiver prepended for virtual/interface calls, unchanged for static ones) — a NoSuchMethodError
+     *  otherwise surfaces only when the player clicks (session 3's tribute redirect never linked). */
+    static void testCallRedirectsResolve() throws Exception {
+        System.out.println("CallRedirect resolution:");
+        int bad = 0, n = 0;
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (PatchTable.CallRedirect r : PatchTable.build().redirects) {
+            String name = r.newName().equals("*") ? r.targetName() : r.newName();
+            String recv = r.objectReceiver() ? "java/lang/Object" : r.targetOwner();
+            String virt = "(L" + recv + ";" + r.targetDesc().substring(1);
+            String key = r.newOwner() + "." + name + virt;
+            if (!seen.add(key))
+                continue;
+            n++;
+            try {
+                Class<?> owner = Class.forName(r.newOwner().replace('/', '.'), false, HeadlessTest.class.getClassLoader());
+                boolean found = false;
+                for (java.lang.reflect.Method m : owner.getDeclaredMethods()) {
+                    if (!m.getName().equals(name) || !java.lang.reflect.Modifier.isStatic(m.getModifiers()))
+                        continue;
+                    String d = org.objectweb.asm.Type.getMethodDescriptor(m);
+                    if (d.equals(virt) || d.equals(r.targetDesc()))
+                        found = true;
+                }
+                if (!found) {
+                    bad++;
+                    System.out.println("  MISSING replacement: " + key + " for " + r.targetOwner() + "." + r.targetName() + r.targetDesc());
+                }
+            } catch (Throwable t) {
+                bad++;
+                System.out.println("  MISSING class: " + key + " (" + t + ")");
+            }
+        }
+        check(bad == 0, "all " + n + " call redirect replacements resolve");
     }
 
     /** Every AutoSyncTable entry must name a real declared method / field of the shipped game. */
@@ -218,6 +259,106 @@ public final class HeadlessTest {
     }
 
     /** Full join over real TCP: handshake, fragmented world transfer, command echo. */
+    /** The two tactical-battle entry points carry the SyncTemplates guard. */
+    static void testBattleOrderHooks() throws Exception {
+        System.out.println("testBattleOrderHooks");
+        byte[] locked = transform("game/battle/thread/order/BattleOrder$Locked");
+        check(countCallsInto(locked, "syxmp/agent/SyncTemplates") == 1, "BattleOrder.Locked.set is hooked");
+        byte[] armies = transform("game/battle/Armies");
+        check(countCallsInto(armies, "syxmp/agent/SyncTemplates") == 1, "Armies.initAndTeleport is hooked");
+    }
+
+    /** World battle prompts: the prompt entry hooks and every button's close + decision redirects. */
+    static void testWorldBattleRedirects() throws Exception {
+        System.out.println("testWorldBattleRedirects");
+        byte[] prompt = transform("view/world/ui/battle/UIWBattlePrompt");
+        check(countCallsInto(prompt, "syxmp/agent/SyncTemplates") == 7, "all 7 UIWBattlePrompt entry points hooked");
+        byte[] engage = transform("view/world/ui/battle/BattleBattle$1"); // close.exe(); g.engage();
+        check(countCallsInto(engage, "syxmp/sync/WorldBattleSync") == 2, "BattleBattle engage button: close + engage redirected");
+        byte[] res = transform("view/world/ui/battle/Res$1"); // close; mercy incD; accept x2
+        check(countCallsInto(res, "syxmp/sync/WorldBattleSync") == 4, "Res accept button: close + mercy + accept redirected");
+        byte[] siege = transform("view/world/ui/battle/BattleSiege$3"); // close; spec.retreat() (lift siege)
+        check(countCallsInto(siege, "syxmp/sync/WorldBattleSync") >= 1, "BattleSiege buttons redirected");
+        byte[] conq = transform("view/world/ui/battle/Conquer$7"); // close; mercy; occupy
+        check(countCallsInto(conq, "syxmp/sync/WorldBattleSync") == 3, "Conquer occupy button: close + mercy + occupy redirected");
+    }
+
+    /** The by-value codec for DivFormationImp / BattleOrderTask round-trips every field Locked.set copies. */
+    static void testBattleOrderCodec() throws Exception {
+        System.out.println("testBattleOrderCodec");
+        Class<?> form = Class.forName("game.battle.formation.DivFormationImp");
+        Constructor<?> ctor = form.getDeclaredConstructor(int.class);
+        ctor.setAccessible(true);
+        Object a = ctor.newInstance(8), b = ctor.newInstance(8);
+        // public position API (DivPositionImp) + reflective formation fields; clear()/deployInit touch SETT, so avoid them
+        Method set = form.getMethod("set", int.class, int.class, int.class), init = form.getMethod("init", int.class);
+        set.invoke(a, 0, 100, 200);
+        set.invoke(a, 1, 116, 200);
+        set.invoke(a, 2, 132, 216);
+        init.invoke(a, 3);
+        form.getMethod("setDir", int.class, snake2d.util.datatypes.DIR.class).invoke(a, 1, snake2d.util.datatypes.DIR.SE);
+        form.getMethod("setHasExtraRoom").invoke(a);
+        form.getMethod("coherentSetNot").invoke(a);
+        setField(a, "faceDir", snake2d.util.datatypes.DIR.W);
+        setField(a, "dx", 0.6);
+        setField(a, "dy", -0.8);
+        setField(a, "width", 96);
+        setField(a, "ts", game.battle.formation.DIV_FORMATION.LOOSE);
+        setField(a, "centreI", 1);
+        ((snake2d.util.datatypes.Rec) getField(a, "bounds")).set(90, 140, 190, 230);
+        ((snake2d.util.datatypes.Coo) getField(a, "start")).set(100, 200);
+
+        Method enc = Class.forName("syxmp.sync.BattleOrderSync").getDeclaredMethod("encodeFormation",
+                syxmp.net.ByteWriter.class, form);
+        Method dec = Class.forName("syxmp.sync.BattleOrderSync").getDeclaredMethod("decodeFormation",
+                syxmp.net.ByteReader.class, form);
+        enc.setAccessible(true);
+        dec.setAccessible(true);
+        syxmp.net.ByteWriter w = new syxmp.net.ByteWriter(256);
+        enc.invoke(null, w, a);
+        byte[] bytes = w.toArray();
+        dec.invoke(null, new syxmp.net.ByteReader(bytes), b);
+        syxmp.net.ByteWriter w2 = new syxmp.net.ByteWriter(256);
+        enc.invoke(null, w2, b);
+        check(java.util.Arrays.equals(bytes, w2.toArray()), "formation re-encodes identically after decode");
+        check((Boolean) form.getMethod("isSameAs", form).invoke(a, b), "decoded formation isSameAs the original");
+        check(form.getMethod("dir", int.class).invoke(b, 1) == snake2d.util.datatypes.DIR.SE, "dir masks copied");
+        check((Boolean) form.getMethod("hasExtraRoom").invoke(b) && !(Boolean) form.getMethod("isCoherent").invoke(b),
+                "flags copied");
+        check(((snake2d.util.datatypes.Rec) getField(b, "bounds")).x2() == 140, "bounds copied");
+
+        Class<?> taskC = Class.forName("game.battle.thread.order.BattleOrderTask");
+        Object t = taskC.getConstructor().newInstance(), t2 = taskC.getConstructor().newInstance();
+        setField(t, "task", game.battle.thread.order.BattleOrderTask.DIVTASK.ATTACK_BUILDING);
+        setField(t, "target", 0x10 | 0x20 << 16);
+        setField(t, "orderedWhenFighting", true);
+        Method encT = Class.forName("syxmp.sync.BattleOrderSync").getDeclaredMethod("encodeTask",
+                syxmp.net.ByteWriter.class, taskC);
+        Method decT = Class.forName("syxmp.sync.BattleOrderSync").getDeclaredMethod("decodeTask",
+                syxmp.net.ByteReader.class, taskC);
+        encT.setAccessible(true);
+        decT.setAccessible(true);
+        w = new syxmp.net.ByteWriter(32);
+        encT.invoke(null, w, t);
+        decT.invoke(null, new syxmp.net.ByteReader(w.toArray()), t2);
+        check(taskC.getMethod("task").invoke(t2) == game.battle.thread.order.BattleOrderTask.DIVTASK.ATTACK_BUILDING
+                && (Integer) taskC.getMethod("targetTileX").invoke(t2) == 0x10
+                && (Integer) taskC.getMethod("targetTileY").invoke(t2) == 0x20
+                && (Boolean) taskC.getMethod("orderedWhenFighting").invoke(t2), "task round-trips");
+    }
+
+    static void setField(Object o, String name, Object v) throws Exception {
+        java.lang.reflect.Field f = o.getClass().getDeclaredField(name);
+        f.setAccessible(true);
+        f.set(o, v);
+    }
+
+    static Object getField(Object o, String name) throws Exception {
+        java.lang.reflect.Field f = o.getClass().getDeclaredField(name);
+        f.setAccessible(true);
+        return f.get(o);
+    }
+
     static void testJoinFlowOverTcp() throws Exception {
         System.out.println("testJoinFlowOverTcp");
 

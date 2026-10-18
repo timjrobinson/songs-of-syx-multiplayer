@@ -7,8 +7,10 @@ desync detection. "Syncs and communicates in all the same ways, just syncs
 Songs of Syx data."
 
 **Deep reference docs (read these before touching the sync engine):**
-- `docs/HANDOFF3.md` — **START HERE**: session 3 results (170 synced verbs,
-  determinism fixes, installer, chat commands) and what is still open
+- `docs/HANDOFF4.md` — **START HERE**: session 4 (battle orders, world
+  battle prompts, raid demand fix) and what is still open
+- `docs/HANDOFF3.md` — session 3 results (170 synced verbs,
+  determinism fixes, installer, chat commands)
 - `docs/sync-coverage.md` — every UI→sim mutation point, how each is synced,
   and the list of still-local actions
 - `docs/HANDOFF2.md` — session 2 work list (mostly executed in session 3;
@@ -287,7 +289,9 @@ Wire protocol (packets/commands) is mirrored in `syxmp.common.Packets` /
   registrations), AutoSync (generic setter sync; the table is
   `agent/AutoSyncTable`), ObjectPaths, ToolSync (map tools), FieldSync
   (PUTFIELD redirects), UiRedirects (generic containers at UI call sites),
-  SyncActions (composite commands: events, deals, tribute, region buildings)
+  SyncActions (composite commands: events, deals, tribute, region buildings),
+  BattleOrderSync (tactical orders by value), WorldBattleSync (world battle
+  prompts: deterministic pause + decision commands)
 - `src/syxmp/agent/` — SyxAgent (premain), MpTransformer (ASM: entry hooks,
   call redirects, PUTFIELD redirects, <clinit> RND), PatchTable,
   AutoSyncTable (METHODS + FIELDS), SyncTemplates, AgentInstaller
@@ -300,7 +304,15 @@ Wire protocol (packets/commands) is mirrored in `syxmp.common.Packets` /
   fragmented world transfer + command round-trip against a live server. Run
   `./test.sh` after every change.
 
-## Current status (2026-10-18, end of session 3)
+## Current status (2026-10-19, session 4)
+
+Session 4 (`docs/HANDOFF4.md`): tactical battle orders and world battle
+prompts are synced; the raid-demand pay/decline is one synced decision (the
+session-3 tribute redirect had never linked — every CallRedirect replacement
+is now resolved by the headless suite). Version 0.3.1, protocol 7. Not yet
+play-tested by humans; the second test PC was offline (jar not shipped).
+
+## Status at the end of session 3 (2026-10-18)
 
 Verified on two real machines (session 2): join from menu or in-game, world
 transfer, lockstep, cursors, chat, auto-resync. Session 3: sync coverage is

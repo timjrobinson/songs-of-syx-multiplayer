@@ -76,6 +76,8 @@ public final class SaveTransfer {
         pendingAfterLoad = null;
         syxmp.desync.SyncCoordinator.reset();
         BattleSync.reset();
+        syxmp.sync.BattleOrderSync.reset();
+        syxmp.sync.WorldBattleSync.reset();
         syxmp.sync.ObjectPaths.invalidate();
         syxmp.dev.RndTrace.endLoad();
         syxmp.ui.MpCursors.clear();

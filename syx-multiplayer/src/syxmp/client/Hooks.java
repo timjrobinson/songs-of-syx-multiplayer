@@ -87,6 +87,14 @@ public final class Hooks {
         });
 
         syxmp.sync.AutoSync.install();
+        // Tactical battle orders (BattleOrderSync).
+        SyncTemplates.registerAt(PatchTable.HOOK_BATTLE_ORDER_SET,
+                (self, args) -> syxmp.sync.BattleOrderSync.lockedSet(self, args));
+        SyncTemplates.registerAt(PatchTable.HOOK_ARMIES_TELEPORT,
+                (self, args) -> syxmp.sync.BattleOrderSync.initAndTeleport(self, args));
+        // World battle prompts: record + pause when the sim opens one (WorldBattleSync).
+        SyncTemplates.registerAt(PatchTable.HOOK_WBATTLE_PROMPT,
+                (self, args) -> syxmp.sync.WorldBattleSync.promptOpened(self, args));
         SyncTemplates.registerAt(PatchTable.HOOK_TOOL_MULTI_PLACE,
                 (self, args) -> syxmp.sync.ToolSync.multiPlace(self));
 

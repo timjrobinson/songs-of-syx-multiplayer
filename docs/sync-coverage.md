@@ -74,17 +74,15 @@ AIModule_Prisoner, DIP, ROPINION, RD, EVENTS, NOBLES; depth 12).
 
 ## Still local (will desync if used) — in priority order
 
-1. **Tactical battle orders**: `BattleOrder$Locked.set(Copyable)` with
-   UI-owned `BattleOrderTask`/`DivFormationImp` payloads (UISelection,
-   BattlePlacer*), `DivDeployerUser.deploy(LIST<Div>,IIII)` and
-   `deploy(Div,II)`, `Armies.initAndTeleport(LIST)`. Needs a codec for the
-   payloads (`DivPositionImp` is SAVABLE) and a LIST<Div> codec. Division
-   settings fields are already synced.
-2. **World battle prompts** (`view/world/ui/battle/*`): `WBattleSpec.engage/
-   auto/retreat`, `WBattleResult.accept([I[I)`, `WBattleSiege$Result.occupy/
-   abandon/puppet(DD[I[I)`, mercy `incD`. The spec objects are created by the
-   sim and pushed into the UI only; a "battle decision" command keyed by the
-   pending battle is needed. Auto-resolve consumes RND.
+1. ~~Tactical battle orders~~ — synced in session 4 (`BattleOrderSync`):
+   `BattleOrder.Locked.set` (dest/task payloads shipped by value) and
+   `Armies.initAndTeleport`. See `docs/HANDOFF4.md`.
+2. ~~World battle prompts~~ — synced in session 4 (`WorldBattleSync`): the
+   prompt opens in afterTick on every client and pauses the synced clock;
+   close/auto/retreat/accept/occupy/abandon/puppet (+mercy) are commands
+   addressed to the current prompt. **Engage auto-resolves in MP** (the
+   generated tactical battle is a separate saved game). Auto-resolve RND is
+   consumed inside the command (reseeded).
 3. **Recruiting** (`ArmyRecruit.java:94`, composite with RND via
    `WDivRegional.init` → `bannerSet(RND)`), **mercenaries** (`UIMerenaries:106`
    = `ADDiv.reassign` + `FCredits.inc`, both synced individually — verify),
@@ -110,6 +108,13 @@ AIModule_Prisoner, DIP, ROPINION, RD, EVENTS, NOBLES; depth 12).
 - `UIDipMessDeal.pactive()` rewrites `DIP.TMP()` during render on one client;
   the sim resets it before use — watch desync reports pointing at diplomacy.
 - `GAME.SPEED.tmpPause()` from several popups is suppressed in MP (already).
+- The raid demand message (`MessDemand`): session 3's `tributePay` redirect
+  never linked (`NoSuchMethodError`: the replacement took `Object`, the
+  transformer emitted the package-private `MessDemand$Demand` type) and the
+  click's `GAME.raiders().current.clear()` ran on the issuer only. Session 4:
+  `CallRedirect.objectReceiver`, a headless test that resolves every
+  redirect replacement, and pay/decline as one TRIBUTE_PAY/TRIBUTE_DECLINE
+  command that marks and closes the message on every client.
 - `ToolMove.isPlacable` writes shared path scratch on hover (not sim state).
 - `DealDrawfter.draft` consumes RND in UI context: harmless under per-sub-step
   reseeding (the draw happens outside the tick).

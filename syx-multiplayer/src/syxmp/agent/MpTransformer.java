@@ -230,7 +230,8 @@ public final class MpTransformer implements ClassFileTransformer {
                 pv.changed = true;
                 pv.changedBeyondClinit = true;
                 if (opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKEINTERFACE) {
-                    String newDesc = "(L" + r.targetOwner() + ";" + desc.substring(1);
+                    String recv = r.objectReceiver() ? "java/lang/Object" : r.targetOwner();
+                    String newDesc = "(L" + recv + ";" + desc.substring(1);
                     super.visitMethodInsn(Opcodes.INVOKESTATIC, r.newOwner(), r.newName(),
                             newDesc, false);
                     return;

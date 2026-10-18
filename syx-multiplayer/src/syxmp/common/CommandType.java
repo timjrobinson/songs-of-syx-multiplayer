@@ -21,7 +21,7 @@ public enum CommandType {
     SYNC_AUTO,
     /** byte kind + placable path + tiles/area — map tool placement (ToolSync). */
     TOOL,
-    /** byte kind + payload — composite UI actions: event choice, deal, tribute, region buildings (SyncActions). */
+    /** byte kind + payload — composite UI actions: event choice, deal, tribute, region buildings, battle orders (SyncActions/BattleOrderSync). */
     ACTION;
 
     private static final CommandType[] VALUES = values();

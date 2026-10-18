@@ -45,7 +45,19 @@ public final class DevAuto {
 
     /** Scripted player actions, issued from UI context so they go through the sync hooks. */
     private static void act(int i) {
-        switch (i % 4) {
+        switch (i % 5) {
+            case 4 -> {
+                // Tactical battle orders on the first player division (BattleOrderSync): a STOP task and a
+                // re-set of its current destination formation go through the Locked.set hook.
+                game.battle.div.Div div = game.GAME.ARMIES().player().divisions().get(0);
+                MpLog.info("[auto] action: battle order stop + dest on division " + div.index());
+                game.battle.thread.order.BattleOrderTask task = new game.battle.thread.order.BattleOrderTask();
+                task.stop(div);
+                div.order().task.set(task);
+                game.battle.formation.DivFormationImp form = new game.battle.formation.DivFormationImp();
+                div.order().dest.get(form);
+                div.order().dest.set(form);
+            }
             case 3 -> {
                 // Build a 4x4 stockpile: stage blueprint (AutoSync), area (TOOL), commit (AutoSync).
                 settlement.room.main.placement.RoomPlacer placer = settlement.main.SETT.ROOMS().placement.placer;

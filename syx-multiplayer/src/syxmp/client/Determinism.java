@@ -60,8 +60,11 @@ public final class Determinism {
 
     /** Replaces {@code VIEW.world().UI.battle.isBusty()} in WBattles.canPoll. */
     public static boolean worldBattlePromptBusy(view.world.ui.battle.UIWBattlePrompt p) {
+        // In MP the prompt opens and closes by synced commands (WorldBattleSync),
+        // so the local flag is deterministic; the issuer, whose decision is in
+        // flight, must not poll the next battle before everyone else does.
         if (Multiplayer.active())
-            return false;
+            return p.isBusty() || syxmp.sync.WorldBattleSync.decisionPending();
         return p.isBusty();
     }
 

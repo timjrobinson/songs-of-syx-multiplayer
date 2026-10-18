@@ -56,6 +56,11 @@ public final class PatchTable {
     public static final int HOOK_GAME_ERROR = 20;
     /** Dev: short-range pathfinder requests (with -Dsyxmp.enttrace=1). */
     public static final int HOOK_SPATH_FIND = 21;
+    /** Tactical battle orders: BattleOrder.Locked.set and Armies.initAndTeleport become ACTION commands (BattleOrderSync). */
+    public static final int HOOK_BATTLE_ORDER_SET = 22;
+    public static final int HOOK_ARMIES_TELEPORT = 23;
+    /** UIWBattlePrompt.* entry: records the pending world-battle prompt, pauses the clock (WorldBattleSync). */
+    public static final int HOOK_WBATTLE_PROMPT = 24;
 
     // Sync-method hooks (bound to SyncMethod handlers by SyxSync) start at 100.
     public static final int HOOK_IMMIGRATION_ADMIT = 100;
@@ -67,7 +72,14 @@ public final class PatchTable {
             String targetName,
             String targetDesc,
             String newOwner,       // static replacement: (TargetOwner, args...) same return
-            String newName) {
+            String newName,
+            boolean objectReceiver // the replacement takes the receiver as java.lang.Object
+                                   // (for package-private game classes the mod cannot name)
+    ) {
+        public CallRedirect(String inClass, String inMethod, String targetOwner, String targetName,
+                String targetDesc, String newOwner, String newName) {
+            this(inClass, inMethod, targetOwner, targetName, targetDesc, newOwner, newName, false);
+        }
     }
 
     /**
@@ -140,7 +152,9 @@ public final class PatchTable {
                     "view/battle/BattleView", "isActive", "()Z",
                     "syxmp/client/Determinism", "battleViewActive"));
         // WBattles.canPoll (WBattles.java:105) also waits for the local
-        // world-battle prompt to close before resolving sieges.
+        // world-battle prompt to close; with the prompt decisions synced
+        // (WorldBattleSync) it is identical everywhere, and the issuer stays
+        // "busy" until its decision executes.
         t.redirects.add(new CallRedirect("world/battle/WBattles", null,
                 "view/world/ui/battle/UIWBattlePrompt", "isBusty", "()Z",
                 "syxmp/client/Determinism", "worldBattlePromptBusy"));
@@ -287,9 +301,18 @@ public final class PatchTable {
             t.redirects.add(new CallRedirect(ui, null,
                     "game/faction/diplomacy/deal/Deal", "execute", "(Z)D",
                     "syxmp/sync/SyncActions", "dealExecute"));
+        // The raid demand (MessDemand.java:182 pay, :206 decline): pay(),
+        // raiders.current.clear() and the message hide are one decision,
+        // executed on every client; Demand is package-private (Object receiver).
         t.redirects.add(new CallRedirect("game/raiding/MessDemand*", null,
                 "game/raiding/MessDemand$Demand", "pay", "()V",
-                "syxmp/sync/SyncActions", "tributePay"));
+                "syxmp/sync/SyncActions", "tributePay", true));
+        t.redirects.add(new CallRedirect("game/raiding/MessDemand$Demand$*", null,
+                "game/raiding/RaidingCurrent", "clear", "()V",
+                "syxmp/sync/SyncActions", "raidersClear"));
+        t.redirects.add(new CallRedirect("game/raiding/MessDemand$Demand$*", null,
+                "view/ui/message/Messages", "hide", "()V",
+                "syxmp/sync/SyncActions", "tributeHide"));
         t.redirects.add(new CallRedirect("view/world/ui/region/PlayBuildingsPop*", null,
                 "world/region/building/RDLevelsTmp", "accept", "()V",
                 "syxmp/sync/SyncActions", "regionBuildAccept"));
@@ -297,6 +320,36 @@ public final class PatchTable {
         t.redirects.add(new CallRedirect("world/region/building/RDBuilding*", null,
                 "world/region/building/RDLevelsTmp", "level", "(Lworld/region/building/RDBuilding;Lworld/map/regions/Region;)I",
                 "syxmp/client/Determinism", "rdLevel"));
+
+        // Tactical battle orders: every order from the battle UI ends in
+        // div.order().dest/task.set(payload) (BattleOrder.java:60, called
+        // from UISelection, BattlePlacer*, DivDeployerUser) or, while a
+        // generated battle is deploying, Armies.initAndTeleport
+        // (Armies.java:236). Both are shipped by value (BattleOrderSync).
+        t.hooks.add(new EntryHook("game/battle/thread/order/BattleOrder$Locked", "set",
+                "(Lgame/battle/util/Copyable;)V", HOOK_BATTLE_ORDER_SET));
+        t.hooks.add(new EntryHook("game/battle/Armies", "initAndTeleport",
+                "(Lsnake2d/util/sets/LIST;)V", HOOK_ARMIES_TELEPORT));
+
+        // World battle prompts (WorldBattleSync): the sim opens them in
+        // afterTick on every client; every button's close + decision call is
+        // a command addressed to the current prompt.
+        String wbp = "view/world/ui/battle/UIWBattlePrompt";
+        for (String m : new String[] {"battle", "assist", "lastStand", "battleSally"})
+            t.hooks.add(new EntryHook(wbp, m, "(Lworld/battle/spec/WBattleSpec;)V", HOOK_WBATTLE_PROMPT));
+        t.hooks.add(new EntryHook(wbp, "siege", "(Lworld/battle/spec/WBattleSiege;)V", HOOK_WBATTLE_PROMPT));
+        t.hooks.add(new EntryHook(wbp, "result", "(Lworld/battle/spec/WBattleSiege$Result;)V", HOOK_WBATTLE_PROMPT));
+        t.hooks.add(new EntryHook(wbp, "result", "(Lworld/battle/spec/WBattleResult;Z)V", HOOK_WBATTLE_PROMPT));
+        String wbUi = "view/world/ui/battle/*", wbs = "syxmp/sync/WorldBattleSync";
+        for (String owner : new String[] {"world/battle/spec/WBattleSpec", "world/battle/spec/WBattleSiege"})
+            for (String m : new String[] {"engage", "auto", "retreat"})
+                t.redirects.add(new CallRedirect(wbUi, null, owner, m, "()V", wbs, m));
+        t.redirects.add(new CallRedirect(wbUi, null, "world/battle/spec/WBattleResult", "accept", "([I[I)V", wbs, "accept"));
+        for (String m : new String[] {"occupy", "abandon", "puppet"})
+            t.redirects.add(new CallRedirect(wbUi, null, "world/battle/spec/WBattleSiege$Result", m, "(DD[I[I)V", wbs, m));
+        t.redirects.add(new CallRedirect(wbUi, null, "util/data/DOUBLE_O$DOUBLE_OE", "incD",
+                "(Ljava/lang/Object;D)Lutil/data/DOUBLE_O$DOUBLE_OE;", wbs, "mercyInc"));
+        t.redirects.add(new CallRedirect(wbUi, null, "snake2d/util/misc/ACTION", "exe", "()V", wbs, "close"));
 
         // Direct field assignments from UI code (AutoSyncTable.FIELDS).
         for (String[] f : AutoSyncTable.FIELDS)

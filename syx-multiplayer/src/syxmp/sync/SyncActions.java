@@ -46,6 +46,12 @@ import world.region.building.RDLevelsTmp;
 public final class SyncActions {
 
     private static final byte EVENT_CHOICE = 0, DEAL_EXECUTE = 1, TRIBUTE_PAY = 2, REGION_BUILD = 3;
+    /** Tactical battle orders (BattleOrderSync). */
+    static final byte BATTLE_ORDER = 4, BATTLE_TELEPORT = 5;
+    /** Raid demand declined (closes the message everywhere). */
+    static final byte TRIBUTE_DECLINE = 7;
+    /** World battle prompt decisions (WorldBattleSync). */
+    static final byte WORLD_BATTLE = 6;
 
     private SyncActions() {
     }
@@ -101,6 +107,7 @@ public final class SyncActions {
     public static void frame() {
         pendingEvent = null;
         pendingChoice = -1;
+        tributeSent = false;
     }
 
     private static void sendEventChoice(Event e, int k, EContext data) {
@@ -240,15 +247,32 @@ public final class SyncActions {
     }
 
     // =========================================================================
-    // Tribute (game/raiding/MessDemand.java Demand.pay)
+    // Raid demand (game/raiding/MessDemand.java:182-212)
+    //
+    // Pay: payed=true; pay(); GAME.raiders().current.clear(); messages.hide();
+    // new MessDemandTY(raider).send(). pay() and clear() are sim state (the
+    // session-3 version only mirrored pay(), and its redirect did not even
+    // link: Demand is package-private). Decline: declined=true; hide() —
+    // UI-only, but the other player's message must close too. The three
+    // redirected calls become one TRIBUTE_PAY or TRIBUTE_DECLINE command
+    // keyed by the raid iteration; every client then marks its own copy of
+    // the message and closes it.
     // =========================================================================
 
+    private static boolean tributeSent;
+    private static final Set<Integer> declinedSent = new HashSet<>();
+
+    private static int demandIteration(Object demand) throws ReflectiveOperationException {
+        return ReflectUtil.field(demand.getClass(), "iteration").getInt(demand);
+    }
+
     public static void tributePay(Object demand) {
-        int credits;
+        int credits, iteration;
         int[] resources;
         try {
             credits = ReflectUtil.field(demand.getClass(), "credits").getInt(demand);
             resources = (int[]) ReflectUtil.field(demand.getClass(), "resources").get(demand);
+            iteration = demandIteration(demand);
         } catch (ReflectiveOperationException | RuntimeException e) {
             MpLog.err("tribute: cannot read demand", e);
             pay(demand);
@@ -260,12 +284,51 @@ public final class SyncActions {
         }
         ByteWriter w = new ByteWriter(64 + resources.length * 4);
         w.writeByte(TRIBUTE_PAY);
+        w.writeInt(iteration);
         w.writeInt(credits);
         w.writeInt(resources.length);
         for (int v : resources)
             w.writeInt(v);
         ClientCommands.send(CommandType.ACTION, w);
-        MpLog.debug("synced tribute payment");
+        tributeSent = true;
+        MpLog.debug("synced tribute payment for raid " + iteration);
+    }
+
+    /** GAME.raiders().current.clear() right after pay(): runs inside the command instead. */
+    public static void raidersClear(game.raiding.RaidingCurrent c) {
+        if (Multiplayer.shouldSync() && tributeSent)
+            return;
+        c.clear();
+    }
+
+    /** VIEW.messages().hide() at the end of the pay/decline click. */
+    public static void tributeHide(view.ui.message.Messages m) {
+        if (!Multiplayer.shouldSync()) {
+            m.hide();
+            return;
+        }
+        if (tributeSent)
+            return; // the command closes it everywhere
+        // Decline: the click set declined=true on its Demand; find it and announce it.
+        try {
+            for (Object mess : messages()) {
+                if (!mess.getClass().getName().equals("game.raiding.MessDemand"))
+                    continue;
+                Object demand = ReflectUtil.field(mess.getClass(), "demand").get(mess);
+                int iteration = demandIteration(demand);
+                if (ReflectUtil.field(demand.getClass(), "declined").getBoolean(demand) && declinedSent.add(iteration)) {
+                    ByteWriter w = new ByteWriter(8);
+                    w.writeByte(TRIBUTE_DECLINE);
+                    w.writeInt(iteration);
+                    ClientCommands.send(CommandType.ACTION, w);
+                    MpLog.debug("synced tribute decline for raid " + iteration);
+                    return;
+                }
+            }
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            MpLog.err("tribute decline: cannot find the demand message", e);
+        }
+        m.hide();
     }
 
     private static void pay(Object demand) {
@@ -276,19 +339,90 @@ public final class SyncActions {
         }
     }
 
-    /** Mirror of MessDemand.Demand.pay() (MessDemand.java:182). */
-    private static void executeTribute(ByteReader r) {
+    /** Mirror of the whole pay click (MessDemand.java:182-190) on every client. */
+    private static void executeTribute(ByteReader r) throws Exception {
+        int iteration = r.readInt();
         int credits = r.readInt();
         int n = r.readInt();
         int[] resources = new int[n];
         for (int i = 0; i < n; i++)
             resources[i] = r.readInt();
+        game.raiding.RaidingCurrent cur = GAME.raiders().current;
+        Method canPay = ReflectUtil.method(game.raiding.RaidingCurrent.class, "canPay", int.class);
+        if (!(Boolean) canPay.invoke(cur, iteration)) {
+            MpLog.info("tribute for raid " + iteration + " ignored: no longer payable (already decided?)");
+            return;
+        }
         FACTIONS.player().credits().inc(-credits, CTYPE.TRIBUTE);
         for (TRADABLE res : TR.ALL()) {
             if (res.index() >= resources.length)
                 continue;
             FACTIONS.player().seller(res).remove(resources[res.index()], TRADE_TYPE.spoils, 0, null);
         }
+        cur.clear();
+        Object mess = markDemand(iteration, "payed");
+        if (mess != null && !syxmp.client.CommandExecutor.currentCmdIssuedBySelf) {
+            // the issuer's click already sent its thank-you message
+            Object raider = ReflectUtil.field(mess.getClass(), "raider").get(mess);
+            Class<?> ty = Class.forName("game.raiding.MessDemandTY");
+            java.lang.reflect.Constructor<?> c = ty.getDeclaredConstructor(raider.getClass());
+            c.setAccessible(true);
+            ReflectUtil.method(ty, "send").invoke(c.newInstance(raider));
+        }
+    }
+
+    private static void executeTributeDecline(ByteReader r) throws Exception {
+        int iteration = r.readInt();
+        declinedSent.add(iteration);
+        markDemand(iteration, "declined");
+    }
+
+    /** Sets the flag on this client's copy of the demand message and closes it if it is on screen. */
+    private static Object markDemand(int iteration, String flag) throws ReflectiveOperationException {
+        for (Object mess : messages()) {
+            if (!mess.getClass().getName().equals("game.raiding.MessDemand"))
+                continue;
+            Object demand = ReflectUtil.field(mess.getClass(), "demand").get(mess);
+            if (demandIteration(demand) != iteration)
+                continue;
+            ReflectUtil.field(demand.getClass(), flag).setBoolean(demand, true);
+            view.ui.message.Messages ms = view.main.VIEW.messages();
+            Object shown = shownMessage(ms);
+            if (shown == mess || (shown == null && ms.activated()))
+                ms.hide();
+            return mess;
+        }
+        MpLog.info("raid demand message for iteration " + iteration + " not found on this client");
+        return null;
+    }
+
+    private static java.util.List<Object> messages() throws ReflectiveOperationException {
+        java.util.List<Object> out = new java.util.ArrayList<>();
+        Object messages = view.main.VIEW.messages();
+        Field fAll = findListField(messages.getClass());
+        if (fAll == null)
+            return out;
+        if (fAll.get(messages) instanceof snake2d.util.sets.LIST<?> l)
+            for (int i = 0; i < l.size(); i++)
+                out.add(l.get(i));
+        return out;
+    }
+
+    /** The message open in the single-message interrupter (Messages.imess), or null if unknown. */
+    private static Object shownMessage(view.ui.message.Messages ms) {
+        try {
+            Field fI = ReflectUtil.field(view.ui.message.Messages.class, "imess");
+            Object imess = fI.get(ms);
+            for (Field f : imess.getClass().getDeclaredFields()) {
+                if (view.ui.message.Message.class.isAssignableFrom(f.getType())) {
+                    f.setAccessible(true);
+                    return f.get(imess);
+                }
+            }
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            // unknown layout: fall back to hiding whatever is open
+        }
+        return null;
     }
 
     // =========================================================================
@@ -340,6 +474,10 @@ public final class SyncActions {
             case DEAL_EXECUTE -> executeDeal(data);
             case TRIBUTE_PAY -> executeTribute(data);
             case REGION_BUILD -> executeRegionBuild(data);
+            case BATTLE_ORDER -> BattleOrderSync.executeOrder(data);
+            case BATTLE_TELEPORT -> BattleOrderSync.executeTeleport(data);
+            case WORLD_BATTLE -> WorldBattleSync.execute(data);
+            case TRIBUTE_DECLINE -> executeTributeDecline(data);
             default -> MpLog.err("unknown action kind " + kind);
         }
     }
