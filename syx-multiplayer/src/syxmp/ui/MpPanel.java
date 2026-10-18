@@ -166,6 +166,12 @@ public final class MpPanel extends InterGui {
         MultiplayerSession session = Multiplayer.session;
         if (msg.isEmpty() || session == null || session.connection == null)
             return;
+        if (msg.equalsIgnoreCase("/hash")) {
+            ByteWriter w = new ByteWriter(1);
+            w.writeByte(0);
+            syxmp.client.ClientCommands.send(syxmp.common.CommandType.DEBUG_TOOLS, w);
+            return;
+        }
         ByteWriter w = new ByteWriter();
         w.writeString(msg);
         session.connection.send(Packets.CLIENT_CHAT, w);

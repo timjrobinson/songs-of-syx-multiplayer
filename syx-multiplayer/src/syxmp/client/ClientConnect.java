@@ -24,10 +24,7 @@ public final class ClientConnect {
             MpLog.err("already in a multiplayer session");
             return;
         }
-        MultiplayerSession session = new MultiplayerSession();
-        session.username = username;
-        session.isHost = false;
-        Multiplayer.session = session;
+        MultiplayerSession session = newSession(username);
         syxmp.ui.MpStatus.set("connecting to " + address + ":" + port + "...");
 
         Thread t = new Thread(() -> {
@@ -35,20 +32,12 @@ public final class ClientConnect {
                 Socket socket = new Socket();
                 socket.connect(new InetSocketAddress(address, port), 10_000);
                 MainThread.enqueue(() -> {
+                    if (Multiplayer.session != session)
+                        return; // cancelled meanwhile
                     try {
                         TcpConnection conn = new TcpConnection(socket, MainThread::enqueue);
-                        conn.username = username;
-                        session.connection = conn;
-                        conn.onClosed = (reason, info) -> {
-                            MpLog.err("connection lost: " + reason + (info != null ? " (" + info + ")" : ""));
-                            if (Multiplayer.session == session) {
-                                Multiplayer.session = null;
-                                syxmp.ui.MpStatus.fail("disconnected: " + reason
-                                        + (info != null ? " (" + info + ")" : ""));
-                            }
-                        };
-                        conn.changeState(ConnectionStateEnum.CLIENT_JOINING,
-                                new ClientJoiningState(conn, session, password));
+                        conn.onClosed = (reason, info) -> onConnectionLost(conn, reason, info);
+                        start(conn, session, password);
                         conn.startReading();
                     } catch (IOException e) {
                         MpLog.err("failed to set up connection", e);
@@ -67,6 +56,41 @@ public final class ClientConnect {
         t.start();
     }
 
+    /** Join through an already-open transport connection (Steam P2P). Game thread. */
+    public static void attach(syxmp.net.ConnectionBase conn, String username, String password) {
+        if (Multiplayer.active()) {
+            MpLog.err("already in a multiplayer session");
+            return;
+        }
+        start(conn, newSession(username), password);
+    }
+
+    private static MultiplayerSession newSession(String username) {
+        MultiplayerSession session = new MultiplayerSession();
+        session.username = username;
+        session.isHost = false;
+        Multiplayer.session = session;
+        return session;
+    }
+
+    private static void start(syxmp.net.ConnectionBase conn, MultiplayerSession session, String password) {
+        conn.username = session.username;
+        session.connection = conn;
+        conn.changeState(ConnectionStateEnum.CLIENT_JOINING,
+                new ClientJoiningState(conn, session, password));
+    }
+
+    /** Transport callback: the connection died. */
+    public static void onConnectionLost(syxmp.net.ConnectionBase conn, syxmp.common.MpDisconnectReason reason, String info) {
+        MpLog.err("connection lost: " + reason + (info != null ? " (" + info + ")" : ""));
+        MultiplayerSession session = Multiplayer.session;
+        if (session != null && session.connection == conn) {
+            Multiplayer.session = null;
+            syxmp.ui.MpStatus.fail("disconnected: " + reason + (info != null ? " (" + info + ")" : ""));
+            syxmp.steam.SteamMp.sessionEnded();
+        }
+    }
+
     /** Leave the current session (client or host). Safe to call when not connected. */
     public static void disconnect(String why) {
         MultiplayerSession session = Multiplayer.session;
@@ -83,5 +107,6 @@ public final class ClientConnect {
         TickController.simulatingTarget = -1;
         TickController.onSimulatingDone = null;
         Multiplayer.reloading = false;
+        syxmp.steam.SteamMp.sessionEnded();
     }
 }

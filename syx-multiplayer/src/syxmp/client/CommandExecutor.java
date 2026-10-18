@@ -42,7 +42,11 @@ public final class CommandExecutor {
                 }
                 case SYNC -> Sync.handleSyncCommand(data);
                 case DEBUG_TOOLS -> {
-                    // Not implemented yet
+                    int tool = data.readByte();
+                    if (tool == 0)
+                        syxmp.dev.SaveDiff.log("t" + cmd.ticks + " by " + cmd.playerId);
+                    else
+                        MpLog.err("unknown debug tool " + tool);
                 }
             }
             syxmp.desync.SyncCoordinator.recordCommand(RND.rInt());

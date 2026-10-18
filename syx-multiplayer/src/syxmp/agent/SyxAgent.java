@@ -19,6 +19,20 @@ public final class SyxAgent {
     public static void premain(String args, Instrumentation inst) {
         instrumentation = inst;
         inst.addTransformer(new MpTransformer(PatchTable.build()), true);
+        if (syxmp.dev.VerbTrace.ENABLED) {
+            inst.addTransformer(new TraceTransformer(), true);
+            System.out.println("[SyxMP] verb tracing enabled");
+        }
+        SyncTemplates.registerAt(PatchTable.HOOK_VIEW_UPDATE, (self, a) -> {
+            syxmp.dev.VerbTrace.uiContext = true;
+            if (syxmp.dev.VerbTrace.updaterThread == null)
+                syxmp.dev.VerbTrace.updaterThread = Thread.currentThread();
+            return false;
+        });
+        SyncTemplates.registerAt(PatchTable.HOOK_VIEW_RENDER, (self, a) -> {
+            syxmp.dev.VerbTrace.uiContext = false;
+            return false;
+        });
         // The menu hook needs a handler before the game reaches the menu;
         // DevAuto is safe to load here (no game classes in its class init).
         SyncTemplates.registerAt(PatchTable.HOOK_MENU_UPDATE, (self, a) -> {
@@ -35,6 +49,11 @@ public final class SyxAgent {
                 t.printStackTrace(System.out);
             return false;
         });
+        if (syxmp.dev.RndTrace.ENABLED)
+            SyncTemplates.registerAt(PatchTable.HOOK_RND_DRAW, (self, a) -> {
+                syxmp.dev.RndTrace.onDraw();
+                return false;
+            });
         Runtime.getRuntime().addShutdownHook(new Thread(SyxAgent::dumpShutdown, "SyxMP-ShutdownDump"));
         System.out.println("[SyxMP] agent installed");
     }

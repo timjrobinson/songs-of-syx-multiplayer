@@ -31,6 +31,14 @@ public final class PatchTable {
     public static final int HOOK_CORE_ANNIHILATE_T = 6;
     /** IMenu.exit2Menu: leaving a game ends the multiplayer session. */
     public static final int HOOK_EXIT_TO_MENU = 7;
+    /** VIEW.update / VIEW.render entry: UI-context bracketing for VerbTrace. */
+    public static final int HOOK_VIEW_UPDATE = 8;
+    public static final int HOOK_VIEW_RENDER = 9;
+    /** Pathfinder: never consume async results / never queue async jobs in MP. */
+    public static final int HOOK_PATH_IS_PROCESSED = 10;
+    public static final int HOOK_PATH_PREP = 11;
+    /** Dev: RND draw tracing (hooks only installed with -Dsyxmp.rndtrace=1). */
+    public static final int HOOK_RND_DRAW = 12;
 
     // Sync-method hooks (bound to SyncMethod handlers by SyxSync) start at 100.
     public static final int HOOK_IMMIGRATION_ADMIT = 100;
@@ -65,6 +73,49 @@ public final class PatchTable {
                 "game/GAME", "update", "(DD)V",
                 "syxmp/client/TickController", "gameUpdate"));
 
+        // Determinism catalogue ------------------------------------------
+        // Per-frame game.afterTick() (VIEW.java:193) runs from the lockstep
+        // loop in MP instead of once per rendered frame.
+        t.redirects.add(new CallRedirect(
+                "view/main/VIEW", "update",
+                "game/GAME", "afterTick", "()V",
+                "syxmp/client/Determinism", "afterTick"));
+        // Pathfinder: SPath.resumeThreaded takes the async result if the
+        // finder thread happens to be done (SPath.java:243) — timing
+        // dependent. Force the synchronous branch and stop queueing jobs.
+        t.hooks.add(new EntryHook("settlement/path/thread/FinderThread$ThreadPath",
+                "isProcessed", "(IIII)Z", HOOK_PATH_IS_PROCESSED));
+        t.hooks.add(new EntryHook("settlement/path/thread/FinderThread", "prep",
+                "(Lsettlement/path/path/SPath;IIIIZ)V", HOOK_PATH_PREP));
+        // Sim code that reads the local room-placement staging layer.
+        for (String cls : new String[] {
+                "settlement/tilemap/floor/Snow", "settlement/overlay/Addable",
+                "settlement/room/industry/woodcutter/Constructor",
+                "settlement/room/food/pasture/ConstructorOutdoor",
+                "settlement/room/law/stockade/Constructor",
+                "settlement/room/food/fish/Constructor",
+                "settlement/room/food/farm/Constructor"}) {
+            t.redirects.add(new CallRedirect(cls, null,
+                    "snake2d/util/map/MAP_BOOLEAN", "is", "(I)Z",
+                    "syxmp/client/Determinism", "embryoIs"));
+            t.redirects.add(new CallRedirect(cls, null,
+                    "snake2d/util/map/MAP_BOOLEAN", "is", "(II)Z",
+                    "syxmp/client/Determinism", "embryoIs"));
+        }
+
+        // Dev-only RND call-site tracing (zero cost unless enabled: hooks absent).
+        if ("1".equals(System.getProperty("syxmp.rndtrace"))) {
+            String[][] rnd = {
+                {"rInt", "()I"}, {"rBoolean", "()Z"}, {"rInt", "(I)I"}, {"rInt0", "(I)I"},
+                {"rFloat", "()F"}, {"rFloatP", "(F)F"}, {"rFloat", "(D)F"}, {"rFloat1", "(D)F"},
+                {"rFloat0", "(D)F"}, {"oneIn", "(I)Z"}, {"oneIn", "(D)Z"}, {"oneInD", "(D)Z"},
+                {"rShort", "(I)S"}, {"rShort", "()S"}, {"rLong", "()J"}, {"rExpo", "()F"},
+                {"rSign", "()D"},
+            };
+            for (String[] m : rnd)
+                t.hooks.add(new EntryHook("snake2d/util/rnd/RND", m[0], m[1], HOOK_RND_DRAW));
+        }
+
         // Speed controls become synced commands (or are suppressed) in MP.
         t.hooks.add(new EntryHook("game/GameSpeed", "speedSet", "(D)V", HOOK_SPEED_SET));
         t.hooks.add(new EntryHook("game/GameSpeed", "togglePause", "()V", HOOK_TOGGLE_PAUSE));
@@ -80,6 +131,8 @@ public final class PatchTable {
                 HOOK_CORE_ANNIHILATE_T));
 
         t.hooks.add(new EntryHook("view/menu/IMenu", "exit2Menu", "()V", HOOK_EXIT_TO_MENU));
+        t.hooks.add(new EntryHook("view/main/VIEW", "update", "(FD)V", HOOK_VIEW_UPDATE));
+        t.hooks.add(new EntryHook("view/main/VIEW", "render", "(Lsnake2d/Renderer;F)V", HOOK_VIEW_RENDER));
 
         // Synced player verbs (see SyxSync.registerAll for the wire handlers).
         t.hooks.add(new EntryHook("settlement/entry/Immigration", "admit",

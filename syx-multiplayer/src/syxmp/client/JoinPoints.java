@@ -6,11 +6,15 @@ import syxmp.util.MpLog;
 
 /**
  * Executes the CREATE_JOIN_POINT command: every client captures its full
- * state at the same tick; the host uploads it as the new joining baseline.
+ * state at the same tick, the host uploads it as the new joining baseline,
+ * and then EVERY client (host included) reloads from its own capture — as in
+ * RW-MP. The reload is what makes joining deterministic: a joiner starts from
+ * loaded state, so everyone else must be in loaded state too (unsaved
+ * accumulators, caches and thread-local leftovers are scrubbed for all).
  *
- * Deviation from RW-MP (documented): RimWorld clients save AND reload at a
- * join point (the reload scrubs cache drift). We capture without reloading,
- * and instead compare state hashes across clients as a deep desync check.
+ * The tick loop yields immediately after this command (no sub-steps, no
+ * timer advance) so the reload resumes exactly at the capture tick; the
+ * clock is frozen for everyone meanwhile.
  */
 public final class JoinPoints {
 
@@ -23,6 +27,7 @@ public final class JoinPoints {
 
     public static void createJoinPoint(int atTimer) {
         MultiplayerSession session = Multiplayer.session;
+        setFrozen(true);
         SaveTransfer.Capture capture = SaveTransfer.capture();
         lastJoinPointTimer = atTimer;
         lastJoinPointHash = capture.rawHash;
@@ -35,5 +40,22 @@ public final class JoinPoints {
             w.writeBytes(capture.saveBytes);
             session.connection.send(Packets.CLIENT_WORLD_DATA_UPLOAD, w);
         }
+
+        syxmp.ui.MpStatus.set("creating join point...");
+        TickController.yieldForReload = true;
+        SaveTransfer.apply(capture.saveBytes, () -> {
+            setFrozen(false);
+            syxmp.ui.MpStatus.set("in game");
+            MpLog.info("join point reload complete at timer " + TickController.timer);
+        });
+    }
+
+    private static void setFrozen(boolean frozen) {
+        MultiplayerSession session = Multiplayer.session;
+        if (session == null || session.connection == null)
+            return;
+        ByteWriter w = new ByteWriter(1);
+        w.writeBool(frozen);
+        session.connection.send(Packets.CLIENT_FREEZE, w);
     }
 }

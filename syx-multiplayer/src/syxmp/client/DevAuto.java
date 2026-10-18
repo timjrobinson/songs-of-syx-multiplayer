@@ -19,6 +19,10 @@ public final class DevAuto {
     private static final String AUTOLOAD = System.getProperty("syxmp.autoload");
     private static final String AUTOHOST = System.getProperty("syxmp.autohost");
     private static final String AUTOJOIN = System.getProperty("syxmp.autojoin");
+    /** -Dsyxmp.autounpause=1: host sets speed 1 a few seconds after a second player is playing. */
+    private static final String AUTOUNPAUSE = System.getProperty("syxmp.autounpause");
+    private static int framesWithTwo;
+    private static boolean unpausedForTwo;
 
     private static int menuFrames;
     private static int gameFrames;
@@ -55,6 +59,15 @@ public final class DevAuto {
             } else if (!unpaused && gameFrames > 600 && Multiplayer.active()) {
                 unpaused = true;
                 MpLog.info("[auto] unpausing (speed 1)");
+                ClientCommands.requestSpeed(1.0);
+            }
+        }
+
+        if (AUTOUNPAUSE != null && !unpausedForTwo && Multiplayer.active()
+                && Multiplayer.session.isHost && Multiplayer.session.players.size() >= 2) {
+            if (++framesWithTwo == 300) {
+                unpausedForTwo = true;
+                MpLog.info("[auto] second player present: speed 1");
                 ClientCommands.requestSpeed(1.0);
             }
         }

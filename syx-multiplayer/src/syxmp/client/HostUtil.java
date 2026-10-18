@@ -89,5 +89,6 @@ public final class HostUtil {
         Multiplayer.localServer = server;
         server.start();
         MpLog.info("hosting on port " + settings.port);
+        syxmp.steam.SteamMp.hostStarted(server);
     }
 }

@@ -52,9 +52,17 @@ unzip -oq "$ASM_JAR" 'org/*' -d "$CLASSES"
 "$JDK/bin/jar" --create --file "$JAR" --manifest "$ROOT/mod/MANIFEST.MF" -C "$CLASSES" .
 echo "built $JAR"
 
-# Install into the game's mods folder
-DEST="$MODS_DIR/$MOD_NAME"
-mkdir -p "$DEST/$GAME_MAJOR_VERSION/script"
-cp "$ROOT/mod/_Info.txt" "$DEST/_Info.txt"
-cp "$JAR" "$DEST/$GAME_MAJOR_VERSION/script/$MOD_NAME.jar"
-echo "installed to $DEST"
+# Install into the game's mods folder (and the two-instance test home).
+# Atomic rename: a running game keeps reading its old jar inode; overwriting
+# in place corrupts lazy class loading in live instances.
+install_to() {
+    local dest="$1/$MOD_NAME"
+    mkdir -p "$dest/$GAME_MAJOR_VERSION/script"
+    cp "$ROOT/mod/_Info.txt" "$dest/_Info.txt"
+    cp "$JAR" "$dest/$GAME_MAJOR_VERSION/script/.$MOD_NAME.jar.tmp"
+    mv -f "$dest/$GAME_MAJOR_VERSION/script/.$MOD_NAME.jar.tmp" "$dest/$GAME_MAJOR_VERSION/script/$MOD_NAME.jar"
+    echo "installed to $dest"
+}
+install_to "$MODS_DIR"
+TEST_HOME="$PROJ/.mp-test-home/.local/share/songsofsyx/mods"
+[[ -d "$TEST_HOME" ]] && install_to "$TEST_HOME"

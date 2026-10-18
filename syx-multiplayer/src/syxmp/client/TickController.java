@@ -38,6 +38,8 @@ public final class TickController {
 
     public static volatile boolean frozen;
     public static boolean desynced;
+    /** Set by JoinPoints: stop the current Timer unit right after the command (RW's yield). */
+    public static boolean yieldForReload;
     /** Fast-forward mode: catch up to simulatingTarget as fast as possible. */
     public static int simulatingTarget = -1;
     public static Runnable onSimulatingDone;
@@ -57,9 +59,21 @@ public final class TickController {
 
     /** Injected in place of {@code game.update(ds, slowDown)} — updater thread. */
     public static void gameUpdate(GAME game, double ds, double slowDown) {
+        // Frame order (snake2d.Updater): update -> input poll (clicks) -> render.
+        // UI context = everything outside this sim phase and outside render.
+        syxmp.dev.VerbTrace.uiContext = false;
+        try {
+            gameUpdateInner(game, ds, slowDown);
+        } finally {
+            syxmp.dev.VerbTrace.uiContext = true;
+        }
+    }
+
+    private static void gameUpdateInner(GAME game, double ds, double slowDown) {
+        currentGame = game;
+        syxmp.steam.SteamMp.pump();
         MainThread.drain();
         DevAuto.gameTick();
-        syxmp.ui.GameUi.frame();
 
         if (!Multiplayer.active()) {
             game.update(ds, slowDown);
@@ -79,6 +93,7 @@ public final class TickController {
         SaveTransfer.finishReloadIfPending();
         if (Multiplayer.reloading)
             return;
+        syxmp.ui.GameUi.frame();
 
         long now = System.nanoTime();
         float frameMs = lastFrameNanos == 0 ? 16.7f
@@ -104,7 +119,8 @@ public final class TickController {
         if (ticks > 0) {
             accumMs -= ticks * (double) msPerTimerUnit;
             for (int i = 0; i < ticks; i++)
-                runOneTimerUnit();
+                if (!runOneTimerUnit())
+                    break;
         }
         // Never bank more than a couple of ticks of real time
         accumMs = Math.min(accumMs, msPerTimerUnit * 2.0);
@@ -114,7 +130,8 @@ public final class TickController {
         long start = System.currentTimeMillis();
         int target = Math.min(simulatingTarget, tickUntil);
         while (timer < target && System.currentTimeMillis() - start < SIMULATE_BUDGET_MS)
-            runOneTimerUnit();
+            if (!runOneTimerUnit())
+                return;
         syxmp.ui.MpStatus.set("catching up " + timer + "/" + simulatingTarget);
         if (timer >= simulatingTarget) {
             simulatingTarget = -1;
@@ -126,15 +143,41 @@ public final class TickController {
         }
     }
 
-    /** One Timer unit: due commands, then as many sub-steps as the speed calls for. */
-    private static void runOneTimerUnit() {
+    private static GAME currentGame;
+
+    /** True once the lockstep loop owns the simulation (connection playing, not reloading). */
+    public static boolean inLockstep() {
+        MultiplayerSession session = Multiplayer.session;
+        return session != null && session.connection != null && !Multiplayer.reloading
+                && session.connection.stateEnum() == syxmp.net.ConnectionStateEnum.CLIENT_PLAYING;
+    }
+
+    /** One Timer unit: due commands, then as many sub-steps as the speed calls for.
+     *  @return false if the unit was aborted for a reload (timer not advanced). */
+    private static boolean runOneTimerUnit() {
         MultiplayerSession session = Multiplayer.session;
         syxmp.desync.SyncCoordinator.onTimerUnit(timer);
+        // Vanilla's per-frame post-tick work, at a deterministic rate (see Determinism.afterTick).
+        if (currentGame != null) {
+            Multiplayer.ticking = true;
+            try {
+                currentGame.afterTick();
+            } finally {
+                Multiplayer.ticking = false;
+            }
+        }
         while (!session.cmds.isEmpty() && session.cmds.peek().ticks <= timer) {
             ScheduledCommand cmd = session.cmds.poll();
             if (cmd.ticks < timer)
                 MpLog.err("late command " + cmd + " at timer " + timer);
             CommandExecutor.execute(cmd);
+            if (yieldForReload) {
+                // The game is about to be replaced by its own capture taken
+                // at this exact point; the remaining commands of this unit
+                // and its sub-steps run after the reload, at the same timer.
+                yieldForReload = false;
+                return false;
+            }
         }
 
         float timePerTick = TickRate.timePerTick(speed);
@@ -149,6 +192,7 @@ public final class TickController {
         if (timer % 600 == 0)
             MpLog.info("clock: timer=" + timer + "/" + tickUntil
                     + " updateI=" + GAME.updateI() + " speed=" + speed);
+        return true;
     }
 
     /**
@@ -161,6 +205,7 @@ public final class TickController {
      */
     private static void runSubStep() {
         Multiplayer.ticking = true;
+        syxmp.dev.RndTrace.beginSubStep(GAME.updateI(), timer);
         try {
             RND.setSeed(mixSeed(Multiplayer.session.rngSeed, GAME.updateI()));
             // GAME.update(double) is the vanilla manual-tick entry
@@ -171,6 +216,7 @@ public final class TickController {
             syxmp.desync.SyncCoordinator.recordSubStep(RND.rInt());
         } finally {
             Multiplayer.ticking = false;
+            syxmp.dev.RndTrace.endSubStep();
         }
     }
 

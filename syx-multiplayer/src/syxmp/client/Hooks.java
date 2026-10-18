@@ -54,6 +54,10 @@ public final class Hooks {
         SyncTemplates.registerAt(PatchTable.HOOK_TMP_PAUSE, suppressInMp);
         SyncTemplates.registerAt(PatchTable.HOOK_UPDATE_ONCE, suppressInMp);
 
+        // Pathfinder: synchronous only while in multiplayer.
+        SyncTemplates.registerAt(PatchTable.HOOK_PATH_IS_PROCESSED, (self, args) -> Multiplayer.active());
+        SyncTemplates.registerAt(PatchTable.HOOK_PATH_PREP, (self, args) -> Multiplayer.active());
+
         // Leaving to the main menu ends the session (host: stops the server).
         SyncTemplates.registerAt(PatchTable.HOOK_EXIT_TO_MENU, (self, args) -> {
             ClientConnect.disconnect("left to main menu");

@@ -52,7 +52,8 @@ public final class MpCursors {
     /** Called every game frame from the client UI driver. */
     public static void sendIfDue() {
         MultiplayerSession session = Multiplayer.session;
-        if (session == null || session.connection == null)
+        if (session == null || session.connection == null
+                || session.connection.stateEnum() != syxmp.net.ConnectionStateEnum.CLIENT_PLAYING)
             return;
         long now = System.currentTimeMillis();
         if (now - lastSent < SEND_INTERVAL_MS)

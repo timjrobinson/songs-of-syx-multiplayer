@@ -3,11 +3,14 @@ package syxmp.steam;
 import java.util.Collections;
 import java.util.List;
 
+import syxmp.server.MultiplayerServer;
+import syxmp.util.MpLog;
+
 /**
  * Steam integration facade (lobbies, rich presence, friends, P2P transport).
- * Everything here degrades to "not available" when the game was not started
- * through Steam. Implementation lands in SteamMpImpl; this facade keeps the
- * rest of the mod free of steamworks4j types.
+ * Everything degrades to "not available" when the game was not started
+ * through Steam. steamworks4j types stay inside SteamMpImpl so the rest of
+ * the mod never loads them (and never fails if the natives are missing).
  */
 public final class SteamMp {
 
@@ -23,26 +26,70 @@ public final class SteamMp {
         }
     }
 
+    private static boolean broken;
+
     private SteamMp() {
     }
 
+    private static SteamMpImpl impl() {
+        if (broken)
+            return null;
+        try {
+            return SteamMpImpl.get();
+        } catch (Throwable t) {
+            broken = true;
+            MpLog.err("steam integration disabled", t);
+            return null;
+        }
+    }
+
     public static boolean available() {
-        return false;
+        return impl() != null;
     }
 
     public static String personaName() {
-        return null;
+        SteamMpImpl i = impl();
+        return i == null ? null : i.personaName();
     }
 
-    /** Pump Steam callbacks; call once per frame from the game thread. */
+    /** Pump Steam callbacks and P2P packets; call once per frame from the game thread. */
     public static void pump() {
+        SteamMpImpl i = impl();
+        if (i == null)
+            return;
+        try {
+            i.pump();
+        } catch (Throwable t) {
+            broken = true;
+            MpLog.err("steam pump failed; steam integration disabled", t);
+        }
     }
 
     public static List<FriendLobby> friendLobbies() {
-        return Collections.emptyList();
+        SteamMpImpl i = impl();
+        return i == null ? Collections.emptyList() : i.friendLobbies();
     }
 
     public static void joinLobby(long lobbyId, String username) {
-        syxmp.util.MpLog.err("steam not available");
+        SteamMpImpl i = impl();
+        if (i == null) {
+            MpLog.err("steam not available");
+            return;
+        }
+        i.joinLobby(lobbyId, username);
+    }
+
+    /** The in-process server is up: open a friends-only lobby and advertise it. */
+    public static void hostStarted(MultiplayerServer server) {
+        SteamMpImpl i = impl();
+        if (i != null)
+            i.hostStarted(server);
+    }
+
+    /** Left or stopped hosting: close lobby, connections and rich presence. */
+    public static void sessionEnded() {
+        SteamMpImpl i = impl();
+        if (i != null)
+            i.sessionEnded();
     }
 }
