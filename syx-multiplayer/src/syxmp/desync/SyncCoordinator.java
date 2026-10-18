@@ -108,6 +108,15 @@ public final class SyncCoordinator {
         ByteWriter w = new ByteWriter(8);
         w.writeInt(atTimer);
         Multiplayer.session.connection.send(Packets.CLIENT_DESYNCED, w);
-        game.GAME.Notify("SyxMP DESYNCED: " + what);
+        syxmp.client.state.ClientPlayingState.ChatLog.add("*", "desync detected (" + what + "); resyncing");
+        try {
+            game.GAME.Notify("SyxMP: desync detected, resyncing...");
+        } catch (RuntimeException e) {
+            // no game
+        }
+        if (!Multiplayer.session.isHost) {
+            // Rejoin on a later frame, outside the tick that detected it.
+            syxmp.client.MainThread.enqueue(() -> syxmp.client.ClientConnect.resync("desync at " + atTimer));
+        }
     }
 }

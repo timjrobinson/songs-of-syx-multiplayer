@@ -25,6 +25,9 @@ public final class ClientConnect {
             return;
         }
         MultiplayerSession session = newSession(username);
+        session.joinAddress = address;
+        session.joinPort = port;
+        session.joinPassword = password;
         syxmp.ui.MpStatus.set("connecting to " + address + ":" + port + "...");
 
         Thread t = new Thread(() -> {
@@ -89,6 +92,29 @@ public final class ClientConnect {
             syxmp.ui.MpStatus.fail("disconnected: " + reason + (info != null ? " (" + info + ")" : ""));
             syxmp.steam.SteamMp.sessionEnded();
         }
+    }
+
+    /**
+     * Desync recovery (clients only): drop and rejoin the same host. The rejoin
+     * creates a fresh join point, so everyone is back in lockstep from loaded
+     * state within seconds — no manual action needed.
+     */
+    public static void resync(String why) {
+        MultiplayerSession old = Multiplayer.session;
+        if (old == null || old.isHost)
+            return;
+        String user = old.username;
+        String addr = old.joinAddress;
+        int port = old.joinPort;
+        long lobby = old.joinLobby;
+        String pw = old.joinPassword;
+        disconnect(why);
+        syxmp.ui.MpStatus.set("resyncing...");
+        MpLog.info("resync: rejoining after " + why);
+        if (lobby != 0)
+            syxmp.steam.SteamMp.joinLobby(lobby, user);
+        else if (addr != null)
+            connect(addr, port, user, pw);
     }
 
     /** Leave the current session (client or host). Safe to call when not connected. */

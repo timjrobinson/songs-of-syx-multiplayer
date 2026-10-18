@@ -71,6 +71,7 @@ public final class TickController {
 
     private static void gameUpdateInner(GAME game, double ds, double slowDown) {
         currentGame = game;
+        Multiplayer.gameThread = Thread.currentThread();
         syxmp.steam.SteamMp.pump();
         MainThread.drain();
         DevAuto.gameTick();
@@ -161,6 +162,7 @@ public final class TickController {
         if (currentGame != null) {
             Multiplayer.ticking = true;
             try {
+                RND.setSeed(mixSeed(session.rngSeed ^ 0xAF7E27C4L, timer));
                 currentGame.afterTick();
             } finally {
                 Multiplayer.ticking = false;
@@ -226,6 +228,7 @@ public final class TickController {
         if (session == null)
             return;
         int seed = mixSeed(session.rngSeed ^ 0x6C0AD5EEDL, timer);
+        syxmp.dev.RndTrace.beginLoad(timer);
         RND.setSeed(seed);
         MpLog.info("seeded RND for load at timer " + timer);
     }

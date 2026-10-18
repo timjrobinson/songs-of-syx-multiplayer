@@ -33,8 +33,12 @@ public final class Multiplayer {
      * Are we in "interface" context — i.e. a player-initiated call that must
      * become a command instead of mutating state? Port of Multiplayer.InInterface.
      */
+    /** The game's updater thread (set on the first lockstep frame). */
+    public static volatile Thread gameThread;
+
     public static boolean inInterface() {
-        return session != null && !ticking && !executingCmds && !reloading;
+        return session != null && !ticking && !executingCmds && !reloading
+                && (gameThread == null || Thread.currentThread() == gameThread);
     }
 
     public static boolean shouldSync() {

@@ -230,6 +230,8 @@ final class SteamMpImpl {
         connections.put(conn.remoteHandle, conn);
         MpLog.info("steam: connecting to host " + friends.getFriendPersonaName(owner));
         ClientConnect.attach(conn, joinUsername, "");
+        if (Multiplayer.session != null)
+            Multiplayer.session.joinLobby = SteamID.getNativeHandle(lobbyId);
         conn.onClosed = (reason, info) -> ClientConnect.onConnectionLost(conn, reason, info);
     }
 

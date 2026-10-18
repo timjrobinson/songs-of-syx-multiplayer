@@ -59,9 +59,12 @@ public final class SaveTransfer {
         pendingAfterLoad = null;
         syxmp.desync.SyncCoordinator.reset();
         syxmp.sync.ObjectPaths.invalidate();
-        syxmp.dev.RndTrace.restart();
+        syxmp.dev.RndTrace.endLoad();
         syxmp.ui.MpCursors.clear();
-        MpLog.info("state loaded; game recreated at timer " + TickController.timer);
+        // Probe: identical on all clients iff RND consumption during the load
+        // was identical (unsaved construction-time random state then matches).
+        MpLog.info("state loaded; game recreated at timer " + TickController.timer
+                + " rndProbe=" + Integer.toHexString(snake2d.util.rnd.RND.rInt()));
         if (r != null)
             r.run();
     }

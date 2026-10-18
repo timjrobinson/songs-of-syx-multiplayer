@@ -9,7 +9,7 @@ public final class ServerSettings {
     public int port = 30599;
 
     public boolean pauseOnJoin = true;
-    public boolean pauseOnDesync = true;
+    public boolean pauseOnDesync = false;
     /** Create a fresh join point automatically when someone joins. */
     public boolean autoJoinPoint = true;
 

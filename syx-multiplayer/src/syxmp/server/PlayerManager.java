@@ -66,6 +66,12 @@ public final class PlayerManager {
     public void onPlaying(ServerPlayer p) {
         p.status = ServerPlayer.Status.PLAYING;
         MpLog.info("player " + p.username() + " is now playing");
+        // The world blob carried the freeze flag at send time; freeze
+        // changes since then were only broadcast to playing players.
+        ByteWriter w = new ByteWriter(8);
+        w.writeBool(server.freezeManager.frozen());
+        w.writeInt(server.gameTimer());
+        p.conn.send(Packets.SERVER_FREEZE, w);
         sendPlayerList();
     }
 
@@ -81,12 +87,15 @@ public final class PlayerManager {
 
     public void sendPlayerList() {
         ByteWriter w = new ByteWriter();
-        List<ServerPlayer> playing = playingPlayers();
-        w.writeInt(playing.size());
-        for (ServerPlayer p : playing)
+        List<ServerPlayer> listed = new ArrayList<>();
+        for (ServerPlayer p : players)
+            if (p.status != ServerPlayer.Status.JOINING)
+                listed.add(p);
+        w.writeInt(listed.size());
+        for (ServerPlayer p : listed)
             p.writeListEntry(w);
         byte[] data = w.toArray();
-        for (ServerPlayer p : playing)
+        for (ServerPlayer p : listed)
             p.conn.send(Packets.SERVER_PLAYER_LIST, data);
     }
 }

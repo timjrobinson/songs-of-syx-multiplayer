@@ -42,6 +42,7 @@ public final class CommandExecutor {
                 }
                 case SYNC -> Sync.handleSyncCommand(data);
                 case SYNC_AUTO -> syxmp.sync.AutoSync.execute(data);
+                case TOOL -> syxmp.sync.ToolSync.execute(data);
                 case DEBUG_TOOLS -> {
                     int tool = data.readByte();
                     if (tool == 0)

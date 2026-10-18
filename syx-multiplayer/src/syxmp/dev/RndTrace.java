@@ -81,9 +81,41 @@ public final class RndTrace {
         }
     }
 
+    /** True from the MP load seed until the new game's first frame. */
+    public static volatile boolean loadPhase;
+
+    /** Called from TickController.seedForLoad: trace draws made while loading. */
+    public static synchronized void beginLoad(int timer) {
+        if (!ENABLED)
+            return;
+        restart();
+        try {
+            Path dir = Path.of(System.getProperty("user.home"), ".local", "share", "songsofsyx", "logs");
+            Files.createDirectories(dir);
+            out = Files.newBufferedWriter(dir.resolve("syxmp-rnd.txt"), StandardCharsets.UTF_8);
+            out.write("## load timer=" + timer + "\n");
+            loadPhase = true;
+        } catch (IOException e) {
+            done = true;
+        }
+    }
+
+    public static synchronized void endLoad() {
+        if (!ENABLED || out == null)
+            return;
+        loadPhase = false;
+        try {
+            out.write("## load end draws=" + drawsInStep + "\n");
+            out.flush();
+        } catch (IOException e) {
+            done = true;
+        }
+        drawsInStep = 0;
+    }
+
     /** Entry hook handler for every RND.r*() method. */
     public static void onDraw() {
-        if (done || out == null || !Multiplayer.ticking)
+        if (done || out == null || !(Multiplayer.ticking || loadPhase))
             return;
         drawsInStep++;
         StackTraceElement[] st = new Throwable().getStackTrace();

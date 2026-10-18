@@ -92,7 +92,7 @@ public final class MpTransformer implements ClassFileTransformer {
 
             List<PatchTable.CallRedirect> redirects = new ArrayList<>();
             for (PatchTable.CallRedirect r : table.redirects)
-                if (r.inClass().equals(className)
+                if (PatchTable.classMatches(r.inClass(), className)
                         && (r.inMethod() == null || r.inMethod().equals(name)))
                     redirects.add(r);
             if (!redirects.isEmpty())
@@ -120,12 +120,20 @@ public final class MpTransformer implements ClassFileTransformer {
         public void visitMethodInsn(int opcode, String owner, String name, String desc,
                 boolean itf) {
             for (PatchTable.CallRedirect r : redirects) {
-                if ((opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKEINTERFACE)
-                        && owner.equals(r.targetOwner()) && name.equals(r.targetName())
-                        && desc.equals(r.targetDesc())) {
+                if (!owner.equals(r.targetOwner()) || !desc.equals(r.targetDesc()))
+                    continue;
+                if (!(r.targetName().equals("*") || name.equals(r.targetName())))
+                    continue;
+                if (opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKEINTERFACE) {
                     String newDesc = "(L" + r.targetOwner() + ";" + desc.substring(1);
                     super.visitMethodInsn(Opcodes.INVOKESTATIC, r.newOwner(), r.newName(),
                             newDesc, false);
+                    return;
+                }
+                if (opcode == Opcodes.INVOKESTATIC) {
+                    // static -> static: same descriptor, same name unless overridden
+                    String newName = r.newName().equals("*") ? name : r.newName();
+                    super.visitMethodInsn(Opcodes.INVOKESTATIC, r.newOwner(), newName, desc, false);
                     return;
                 }
             }

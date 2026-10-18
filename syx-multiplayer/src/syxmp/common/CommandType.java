@@ -18,7 +18,9 @@ public enum CommandType {
     /** dev-mode tool invocation. */
     DEBUG_TOOLS,
     /** string methodKey + string targetPath + args — generic setter sync (AutoSync). */
-    SYNC_AUTO;
+    SYNC_AUTO,
+    /** byte kind + placable path + tiles/area — map tool placement (ToolSync). */
+    TOOL;
 
     private static final CommandType[] VALUES = values();
 

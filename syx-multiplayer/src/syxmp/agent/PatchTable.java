@@ -41,6 +41,8 @@ public final class PatchTable {
     public static final int HOOK_RND_DRAW = 12;
     /** GameLoader.getState entry: deterministic RND seed for game construction in MP. */
     public static final int HOOK_GAME_LOAD = 13;
+    /** PlacableMultiTool.place(): area tools commit here. */
+    public static final int HOOK_TOOL_MULTI_PLACE = 14;
 
     // Sync-method hooks (bound to SyncMethod handlers by SyxSync) start at 100.
     public static final int HOOK_IMMIGRATION_ADMIT = 100;
@@ -113,6 +115,15 @@ public final class PatchTable {
         t.hooks.add(new EntryHook("game/save/GameLoader", "getState", "()Lsnake2d/CORE_STATE;",
                 HOOK_GAME_LOAD));
 
+        // Cosmetic RND users inside the sim tick get their own stream.
+        addVisualRnd(t);
+        // Per-process random lookup tables built in static initializers get a
+        // fixed seed so every client builds the same table.
+        for (String cls : new String[] {"util/updating/TileUpdater", "util/data/RANMAP"})
+            for (String[] m : new String[][] {{"rInt", "(I)I"}, {"rInt", "()I"}, {"rFloat", "()F"}, {"rBoolean", "()Z"}})
+                t.redirects.add(new CallRedirect(cls, null, "snake2d/util/rnd/RND", m[0], m[1],
+                        "syxmp/client/DetRnd", "*"));
+
         // Dev-only RND call-site tracing (zero cost unless enabled: hooks absent).
         if ("1".equals(System.getProperty("syxmp.rndtrace"))) {
             String[][] rnd = {
@@ -144,6 +155,23 @@ public final class PatchTable {
         t.hooks.add(new EntryHook("view/main/VIEW", "update", "(FD)V", HOOK_VIEW_UPDATE));
         t.hooks.add(new EntryHook("view/main/VIEW", "render", "(Lsnake2d/Renderer;F)V", HOOK_VIEW_RENDER));
 
+        // Map tools: commit points become TOOL commands (ToolSync).
+        t.hooks.add(new EntryHook("view/tool/PlacableMultiTool", "place", "()V", HOOK_TOOL_MULTI_PLACE));
+        t.redirects.add(new CallRedirect("view/tool/PlacableSimpleTool", null,
+                "view/tool/PlacableSimple", "place", "(II)V", "syxmp/sync/ToolSync", "placeSimple"));
+        t.redirects.add(new CallRedirect("view/tool/PlacableSimpleTileTool", null,
+                "view/tool/PlacableSimpleTile", "place", "(II)V", "syxmp/sync/ToolSync", "placeSimpleTile"));
+        t.redirects.add(new CallRedirect("view/tool/PlacableFixedTool", null,
+                "view/tool/PlacableFixed", "place", "(IIII)V", "syxmp/sync/ToolSync", "placeFixed"));
+        t.redirects.add(new CallRedirect("view/tool/PlacableSingleTool", null,
+                "view/tool/PlacableSingle", "placeFirst", "(II)V", "syxmp/sync/ToolSync", "placeFirst"));
+        t.redirects.add(new CallRedirect("view/tool/PlacableSingleTool", null,
+                "view/tool/PlacableSingle", "placeExpanded", "(II)V", "syxmp/sync/ToolSync", "placeExpanded"));
+
+        // Audio picks random variants through LIST.rnd(): keep it off the sim stream.
+        t.redirects.add(new CallRedirect("game/audio/*", null,
+                "snake2d/util/sets/LIST", "rnd", "()Ljava/lang/Object;", "syxmp/client/VisualRnd", "listRnd"));
+
         // Generic setter sync (AutoSyncTable): one hook id per entry.
         for (int i = 0; i < AutoSyncTable.METHODS.length; i++)
             t.hooks.add(new EntryHook(AutoSyncTable.owner(i), AutoSyncTable.name(i),
@@ -156,9 +184,41 @@ public final class PatchTable {
         return t;
     }
 
+    /** Classes whose RND use is purely cosmetic but runs inside the sim tick. */
+    private static final String[] VISUAL_RND_CLASSES = {
+        "settlement/tilemap/terrain/TForest$Sprites$TForestTop",
+        "util/rendering/Minimap",          // minimap regeneration (192 draws/tile row) in TileMap.afterTick
+        "snake2d/util/light/Fire",         // light flicker (UI light cycle, torches)
+        "game/audio/*",                    // random sound variants, only drawn when audible
+        // Whole visual layers: sprite composition at load, UI, rendering, menus.
+        "util/spritecomposer/*", "init/sprite/*", "util/rendering/*", "snake2d/util/light/*",
+        "util/gui/*", "menu/*", "view/*",
+    };
+
+    private static final String[][] RND_METHODS = {
+        {"rInt", "()I"}, {"rBoolean", "()Z"}, {"rInt", "(I)I"}, {"rInt0", "(I)I"},
+        {"rFloat", "()F"}, {"rFloat", "(D)F"}, {"rFloat1", "(D)F"},
+        {"rFloat0", "(D)F"}, {"oneIn", "(I)Z"}, {"oneIn", "(D)Z"}, {"oneInD", "(D)Z"},
+        {"rShort", "(I)S"}, {"rShort", "()S"}, {"rLong", "()J"}, {"rExpo", "()F"},
+        {"rSign", "()D"},
+    };
+
+    private static void addVisualRnd(PatchTable t) {
+        for (String cls : VISUAL_RND_CLASSES)
+            for (String[] m : RND_METHODS)
+                t.redirects.add(new CallRedirect(cls, null, "snake2d/util/rnd/RND", m[0], m[1],
+                        "syxmp/client/VisualRnd", "*"));
+    }
+
+    static boolean classMatches(String pattern, String internalClassName) {
+        if (pattern.endsWith("*"))
+            return internalClassName.startsWith(pattern.substring(0, pattern.length() - 1));
+        return pattern.equals(internalClassName);
+    }
+
     public boolean touches(String internalClassName) {
         for (CallRedirect r : redirects)
-            if (r.inClass.equals(internalClassName))
+            if (classMatches(r.inClass, internalClassName))
                 return true;
         for (EntryHook h : hooks)
             if (h.owner.equals(internalClassName))

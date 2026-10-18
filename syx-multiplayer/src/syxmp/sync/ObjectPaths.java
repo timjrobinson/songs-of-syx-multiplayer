@@ -200,7 +200,35 @@ public final class ObjectPaths {
         }
         builds++;
         MpLog.info("object path index: " + paths.size() + " objects in "
-                + (System.currentTimeMillis() - start) + "ms (build " + builds + ")");
+                + (System.currentTimeMillis() - start) + "ms (build " + builds + ")"
+                + (visited >= MAX_OBJECTS ? " TRUNCATED" : ""));
+        if (builds == 1 || visited >= MAX_OBJECTS)
+            logPrefixStats();
+    }
+
+    /** Which subtrees dominate the index (for tuning the skip lists). */
+    private static void logPrefixStats() {
+        Map<String, Integer> counts = new HashMap<>();
+        for (String p : paths.values()) {
+            int cut = p.length();
+            int segs = 0;
+            for (int i = 0; i < p.length(); i++) {
+                char c = p.charAt(i);
+                if (c == '.' || c == '[') {
+                    if (++segs == 3) {
+                        cut = i;
+                        break;
+                    }
+                }
+            }
+            counts.merge(p.substring(0, cut), 1, Integer::sum);
+        }
+        List<Map.Entry<String, Integer>> top = new ArrayList<>(counts.entrySet());
+        top.sort((a, b) -> b.getValue() - a.getValue());
+        StringBuilder sb = new StringBuilder("object path index, largest subtrees:");
+        for (int i = 0; i < Math.min(12, top.size()); i++)
+            sb.append("\n    ").append(top.get(i).getValue()).append("  ").append(top.get(i).getKey());
+        MpLog.info(sb.toString());
     }
 
     private static void enqueue(ArrayDeque<Object[]> queue, Object v, String path, int depth) {

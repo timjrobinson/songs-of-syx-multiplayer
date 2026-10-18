@@ -26,6 +26,12 @@ public final class AutoSyncTable {
         "settlement/room/main/employment/RoomEmployment setPrioOnFullfillment ()V",
         "settlement/room/main/employment/RoomEmployment setPrioOnSkill (Linit/type/WGROUP;)V",
         "settlement/room/main/employment/RoomEmployment setPrioOnFullfillment (Linit/type/WGROUP;)V",
+        // Room placement staging (shared, one planner at a time) and commit
+        "settlement/room/main/placement/RoomPlacer init (Lsettlement/room/main/RoomBlueprintImp;I)V",
+        "settlement/room/main/placement/RoomPlacer create ()Lsnake2d/util/datatypes/COORDINATE;",
+        "settlement/room/main/placement/RoomPlacer popHistory ()Z",
+        "settlement/room/main/placement/RoomPlacer removeAllItems ()Z",
+        "settlement/room/main/placement/RoomPlacer removeArea ()Z",
         // Immigration
         "settlement/entry/Immigration setWanted (Linit/race/Race;I)V",
         "settlement/entry/Immigration setHigher (Linit/race/Race;I)V",

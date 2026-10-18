@@ -15,6 +15,11 @@ import syxmp.net.ConnectionBase;
 public final class MultiplayerSession {
 
     public ConnectionBase connection;
+    /** How this client joined, for automatic resync after a desync. */
+    public String joinAddress;
+    public int joinPort;
+    public long joinLobby;
+    public String joinPassword = "";
     public int playerId = -1;
     public String username;
     public boolean isHost;

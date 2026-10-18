@@ -65,6 +65,8 @@ public final class Hooks {
         });
 
         syxmp.sync.AutoSync.install();
+        SyncTemplates.registerAt(PatchTable.HOOK_TOOL_MULTI_PLACE,
+                (self, args) -> syxmp.sync.ToolSync.multiPlace(self));
 
         MpLog.info("entry hooks installed");
     }
