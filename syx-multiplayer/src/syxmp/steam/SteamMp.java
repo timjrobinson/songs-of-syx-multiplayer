@@ -27,12 +27,27 @@ public final class SteamMp {
     }
 
     private static boolean broken;
+    private static Boolean enabled;
 
     private SteamMp() {
     }
 
+    /**
+     * Steam integration is OPT-IN (SyxMultiplayer.txt: steam=1). On one test
+     * machine (Steam snap on Ubuntu) SteamAPI.runCallbacks() crashed the JVM
+     * with SIGBUS inside the Steam client library — the same crash the game's
+     * own achievement helper process hits there — so the Steam API must never
+     * be touched unless the player asked for it.
+     */
+    public static boolean enabled() {
+        if (enabled == null)
+            enabled = "1".equals(syxmp.ui.MpSettings.get("steam", "0"))
+                    || "1".equals(System.getProperty("syxmp.steam"));
+        return enabled;
+    }
+
     private static SteamMpImpl impl() {
-        if (broken)
+        if (broken || !enabled())
             return null;
         try {
             return SteamMpImpl.get();
