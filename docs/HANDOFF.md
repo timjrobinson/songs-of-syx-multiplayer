@@ -38,6 +38,17 @@ supersedes them where they conflict.)
   its **object path** from static roots (`ObjectPaths`, anchors for
   entities/rooms). Unsyncable calls are logged `UNSYNCED (local only)`.
 
+## Determinism milestone (2026-10-18 19:26)
+
+Two real instances (host + joiner, Elote example save, speed 1, nobody
+touching the UI): **23 minutes, zero desyncs, identical `updateI` at every
+clock line** (`timer=82200 updateI=54797693` on both). Per-savable state
+hashes taken at the same tick match except `COUNTS` (per-user achievement
+thresholds read from the local profile; nothing in the sim reads it).
+The last two causes were: vanilla's five battle AI worker threads, which run
+in every game (now driven synchronously from the sub-step, `BattleSync`), and
+a too-broad visual-RNG wildcard (`*Anim*` caught `animal.Animal`).
+
 ## Load-phase determinism (the big lesson of session 2)
 
 A joiner starts from LOADED state, so every client reloads at join points.
