@@ -81,8 +81,22 @@ public final class DevAuto {
         }
     }
 
+    /** -Dsyxmp.autojoinmenu=host:port — join straight from the main menu (no game loaded first). */
+    private static final String AUTOJOIN_MENU = System.getProperty("syxmp.autojoinmenu");
+    private static boolean menuJoined;
+
     /** Called every main-menu frame via the Menu.update entry hook. */
     public static void menuTick() {
+        if (AUTOJOIN_MENU != null && !menuJoined) {
+            if (++menuFrames < 240)
+                return;
+            menuJoined = true;
+            String[] parts = AUTOJOIN_MENU.split(":");
+            int port = parts.length > 1 ? Integer.parseInt(parts[1]) : 30599;
+            MpLog.info("[auto] joining from the main menu: " + parts[0] + ":" + port);
+            ClientConnect.connect(parts[0], port, "joiner", "");
+            return;
+        }
         if (AUTOLOAD == null || loaded)
             return;
         if (++menuFrames < 90)

@@ -49,6 +49,17 @@ The last two causes were: vanilla's five battle AI worker threads, which run
 in every game (now driven synchronously from the sub-step, `BattleSync`), and
 a too-broad visual-RNG wildcard (`*Anim*` caught `animal.Animal`).
 
+### Scripted-action soak (19:50–)
+
+`run-pair.sh -Dsyxmp.autoact=1 -Dsyxmp.autospeed=5`: the host issues a synced
+player action every 10 s (immigration setting via AutoSync, clear-trees
+designation via ToolSync, speed toggles, staged stockpile via
+AutoSync+ToolSync). Speed 5, >5 minutes, zero desyncs so far. Earlier one
+desync appeared ~8 s after a clear-job designation (before the rolling
+desync traces existed); not reproduced since. On any desync every client
+now writes `<logs>/syxmp-rnd-desync.txt` (last 80 sub-steps of RND call
+sites); `e2e/diffdesync.sh` shows the first divergent draw.
+
 ## Load-phase determinism (the big lesson of session 2)
 
 A joiner starts from LOADED state, so every client reloads at join points.
