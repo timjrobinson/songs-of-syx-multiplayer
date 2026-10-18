@@ -51,7 +51,7 @@ public final class AgentInstaller {
                 return "not running from a jar (" + jar + "); dev setup — add -javaagent manually";
 
             String content = Files.readString(settings, StandardCharsets.UTF_8);
-            String agentArg = "-javaagent:" + jar.toAbsolutePath();
+            String agentArg = "-javaagent:" + jar.toAbsolutePath().toString().replace('\\', '/');
             if (content.contains(agentArg))
                 return "agent already installed; restart the game if it isn't active";
             if (content.contains("-javaagent:")) {

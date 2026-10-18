@@ -50,6 +50,9 @@ public class SyxMultiplayer implements SCRIPT {
         return true;
     }
 
+    /** Set when this run installed the agent and the game must be restarted. */
+    public static String restartNotice;
+
     @Override
     public void initBeforeGameCreated() {
         if (!registered) {
@@ -57,6 +60,14 @@ public class SyxMultiplayer implements SCRIPT {
             SyxSync.registerAll();
             Hooks.installAll();
             MpLog.info("agent " + (SyxAgent.isActive() ? "active" : "NOT ACTIVE"));
+            if (!SyxAgent.isActive()) {
+                // First run after installing the mod: wire the agent into the
+                // launcher settings ourselves; it takes effect on the next start.
+                String result = AgentInstaller.install();
+                MpLog.info("agent auto-install: " + result);
+                restartNotice = "Syx Multiplayer installed. Please QUIT and RESTART the game "
+                        + "(including the launcher) to enable multiplayer.";
+            }
         }
     }
 
@@ -94,10 +105,14 @@ public class SyxMultiplayer implements SCRIPT {
 
     public static final class Instance implements SCRIPT_INSTANCE {
 
+        private int noticeTicks;
+
         @Override
         public void update(double ds) {
             // The lockstep loop lives in TickController, driven from the
             // patched VIEW.update edge — nothing to do per sub-step here.
+            if (restartNotice != null && noticeTicks++ % 600 == 0)
+                game.GAME.Notify(restartNotice);
         }
 
         @Override
