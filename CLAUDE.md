@@ -7,8 +7,10 @@ desync detection. "Syncs and communicates in all the same ways, just syncs
 Songs of Syx data."
 
 **Deep reference docs (read these before touching the sync engine):**
-- `docs/HANDOFF.md` — **START HERE**: session handoff, verified results, how
-  to run the two-instance E2E test, machine-state changes, next steps
+- `docs/HANDOFF2.md` — **START HERE**: what is NOT done and exactly how to
+  finish it (desync workflow, sync-coverage gaps, open hazards, install gaps)
+- `docs/HANDOFF.md` — session chronology, verified results, the determinism
+  catalogue and dev tooling (sessions 1 and 2)
 - `docs/rimworld-mp-architecture.md` — the RW-MP blueprint being ported
 - `docs/sos-internals.md` — Songs of Syx internals survey: tick loop, save
   system, script runtime, player-verb map, stable IDs, determinism hazards
@@ -22,7 +24,17 @@ Songs of Syx data."
   - Game version: **V71.44** (`game/VERSION.java`)
   - Bundled JRE: Temurin 21 (Windows build — on Linux the game runs via
     Proton/Steam or system Java)
-- User data dir: `~/.local/share/songsofsyx/` (`mods/`, `saves/`, `settings/`, `logs/`)
+- User data dir (native Linux): `~/.local/share/songsofsyx/` (`mods/`, `saves/`, `settings/`, `logs/`)
+- **Steam runs the game through Proton on this PC** (native menu fails here), so the
+  REAL player data lives in the Wine prefix:
+  `/mnt/games/SteamLibrary/steamapps/compatdata/1162750/pfx/drive_c/users/steamuser/AppData/Roaming/songsofsyx/`
+  (`build.sh` installs the jar there too; its `LauncherSettings.txt` carries the
+  `-javaagent:C:/users/steamuser/.../SyxMultiplayer.jar` line with forward slashes).
+- Second test machine: the second tester's Ubuntu PC, native Steam (snap) but data in
+  `~/.local/share/songsofsyx/`; `ssh user@<second-pc>` (key auth works);
+  game dir `~/snap/steam/common/.local/share/Steam/steamapps/common/Songs of Syx`
+  with its own bundled JRE 21 (no system java). LAN: this PC <this-pc-ip>.
+- The mod writes its own log: `<data>/logs/syxmp.log` on every machine.
 - Launcher settings: `~/.local/share/songsofsyx/settings/LauncherSettings.txt`
   (JSON-ish; has user-editable `JVM_ARGS2` array — our path to `-javaagent` if
   needed — plus `MODS` list, `DEVELOPER`/`DEBUG` flags)
@@ -277,32 +289,69 @@ Wire protocol (packets/commands) is mirrored in `syxmp.common.Packets` /
   handshake + fragmented world transfer + command round-trip against a live
   server. Run `./test.sh` after every change.
 
-## Current status & roadmap
+## Current status (2026-10-18, end of session 2)
 
-Working (headless-verified): protocol, framing/fragmentation, relay server,
-join handshake, world transfer, command stamping/echo, tick-window interlock,
-bytecode transformer, GameSpeed hooks, first synced verb (Immigration.admit).
+Verified on two real machines: join from menu or in-game, world transfer,
+lockstep, cursors, chat, auto-resync. Determinism soaks: 23 min idle at
+speed 1 and 20 min at speed 5 with 22 scripted synced actions, zero desyncs.
+Real two-human play still desyncs sometimes (causes unread: see
+`docs/HANDOFF2.md` §1). Sync coverage is thin (§2 there). Steam is opt-in and
+untested. Distributable: `syx-multiplayer/package.sh` → `dist/*.zip`.
 
-NOT yet verified in the running game (next session should start here):
-1. Launch the game with the mod + agent (use `MP: install agent`, restart),
-   confirm VIEW.update patch fires and SP still works with agent active.
-2. Host + join on localhost with two instances (second instance needs its own
-   user data dir — game uses one settings/save dir per OS user).
-3. Two-client determinism soak: same actions, watch sync opinions.
-4. Then grow SyxSync verb coverage in the priority order of
-   docs/sos-internals.md §Player verbs (tools → INTE settings → one-offs),
-   and knock down the determinism hazard list (pathfinder sync branch,
-   view-gated sim, battle threads).
-5. UI: join-from-menu, proper chat window, player cursors, desync dialog.
+## Determinism rules (every change must respect these)
 
-Known v1 limitations (documented deviations): joiner must be in a running
-game; battles unsupported (battle view gates sim resources locally); no
-mid-game reload normalization at join points for existing clients; autosave
-should be disabled manually in MP.
+- Nothing may consume the shared `RND` outside a sub-step except through the
+  per-sub-step/per-command reseed. New cosmetic RND users found by the trace go
+  to `VisualRnd` via `PatchTable.VISUAL_RND_CLASSES` (CallRedirect). Audit any
+  wildcard against the jar's class list first — `*Anim*` once matched
+  `settlement.entity.animal.Animal` and desynced every animal.
+- Static initializers draw from `ClinitRnd` (automatic for all game classes),
+  per-game instance tables from `DetRnd` (reset at every MP load), game
+  construction from the two deterministic load seeds (`TickController.
+  seedForLoad` at `GameLoader.getState`, `seedAfterCreate` at
+  `ILoadScreen.activate`). A client's FIRST game in a process loads twice
+  (warm-up) — see HANDOFF2 §3 for why.
+- No wall-clock threads may touch sim state: battle AI workers run from the
+  sub-step (`BattleSync`), long-range path jobs run inside `prep` (`PathSync`).
+  Never "suppress" a worker: the pacing-citizens bug came from that.
+- Per-frame sim work (`GAME.afterTick`) runs once per Timer unit from the
+  lockstep loop, never per rendered frame.
+- `Multiplayer.ticking` must be true around ANY vanilla sim execution
+  (sub-steps, afterTick, the vanilla passthrough while connecting); otherwise
+  the sync hooks mistake sim-internal setter calls for player input.
+- Both machines must run the identical jar (`MpVersion.VERSION` is compared at
+  join; bump `PROTOCOL` on any wire change). `CommandType`, `Packets`, the
+  SyxSync order are append-only.
+
+## Testing workflow
+
+- `syx-multiplayer/e2e/run-pair.sh [jvm flags]` launches host + joiner windowed
+  side by side (both homes are set to windowed 1920x1080; the user wants it
+  that way). `JOINER_MODE=menu` tests the main-menu join. `watch.sh`,
+  `difftrace.sh`, `diffdesync.sh`, `diffload.sh` do the analysis. Flags:
+  `-Dsyxmp.rndtrace=1 -Dsyxmp.noresync=1 -Dsyxmp.autoact=1 -Dsyxmp.autospeed=5
+  -Dsyxmp.autohash=1 -Dsyxmp.enttrace=1 -Dsyxmp.trace=1 -Dsyxmp.autounpause=1`.
+- `kill-games.sh` waits until instances have exited (port 30599!). Kill the
+  pair before the user hosts from Steam on this PC.
+- Screenshots of a game window: `xwd -id <wid> -out f.xwd` then decode with
+  PIL (header 100 bytes, BGRX); find the window with `xdotool search --name
+  "Songs of Syx"` and match the pid's cmdline. The game's PrintScreen key did
+  not produce files when sent via xdotool.
+- `./test.sh` runs the headless suite AND installs the jar (atomically — safe
+  while instances run; the old inode stays mapped). Never copy over the jar
+  in place.
 
 ## Working agreements
 
 - Commit incrementally at each meaningful milestone.
+- When a build is meant for the players, deploy it everywhere: `./test.sh`
+  (installs native + Proton prefix + `.mp-test-home`), `./package.sh` (zip),
+  and `scp out/SyxMultiplayer.jar` to the second test PC
+  (`~/.local/share/songsofsyx/mods/SyxMultiplayer/V71/script/`, via a temp
+  name + `mv`). Tell the user both games must be restarted.
+- The user is often at the machine using the test instances; their key
+  presses show up as synced commands in the logs. Don't launch instances
+  while they are playing for real.
 - reference/ and tools/ stay out of git.
 - When behavior of a game class matters, cite `file.java:line` from
   `reference/syx-sources` in comments/docs — the sources are version-exact.
