@@ -45,6 +45,8 @@ public final class PatchTable {
     public static final int HOOK_TOOL_MULTI_PLACE = 14;
     /** ILoadScreen.activate: called by GameLoader between GAME/VIEW creation and the save load. */
     public static final int HOOK_LOAD_SCREEN = 15;
+    /** BattleThreads.unpause: never start the wall-clock battle workers in MP (BattleSync drives them). */
+    public static final int HOOK_BATTLE_UNPAUSE = 16;
 
     // Sync-method hooks (bound to SyncMethod handlers by SyxSync) start at 100.
     public static final int HOOK_IMMIGRATION_ADMIT = 100;
@@ -93,6 +95,10 @@ public final class PatchTable {
                 "isProcessed", "(IIII)Z", HOOK_PATH_IS_PROCESSED));
         t.hooks.add(new EntryHook("settlement/path/thread/FinderThread", "prep",
                 "(Lsettlement/path/path/SPath;IIIIZ)V", HOOK_PATH_PREP));
+        // Battle AI worker threads run for every game in vanilla; in MP their
+        // jobs run synchronously from the sub-step instead (BattleSync).
+        t.hooks.add(new EntryHook("game/battle/thread/BattleThreads", "unpause", "(Z)V", HOOK_BATTLE_UNPAUSE));
+
         // Sim code that reads the local room-placement staging layer.
         for (String cls : new String[] {
                 "settlement/tilemap/floor/Snow", "settlement/overlay/Addable",

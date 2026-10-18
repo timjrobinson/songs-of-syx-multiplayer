@@ -23,6 +23,9 @@ public final class DevAuto {
     private static final String AUTOUNPAUSE = System.getProperty("syxmp.autounpause");
     private static int framesWithTwo;
     private static boolean unpausedForTwo;
+    /** -Dsyxmp.autohash=1: host requests per-savable state hashes on all clients before unpausing. */
+    private static final String AUTOHASH = System.getProperty("syxmp.autohash");
+    private static boolean hashed;
 
     private static int menuFrames;
     private static int gameFrames;
@@ -75,6 +78,13 @@ public final class DevAuto {
         if (AUTOUNPAUSE != null && Multiplayer.active() && Multiplayer.session.isHost
                 && Multiplayer.session.players.size() >= 2 && TickController.speed == 0
                 && TickController.inLockstep()) {
+            if (AUTOHASH != null && framesWithTwo == 120 && !hashed) {
+                hashed = true;
+                MpLog.info("[auto] requesting state hashes");
+                syxmp.net.ByteWriter w = new syxmp.net.ByteWriter(1);
+                w.writeByte(0);
+                ClientCommands.send(syxmp.common.CommandType.DEBUG_TOOLS, w);
+            }
             if (++framesWithTwo >= 300) {
                 framesWithTwo = 0;
                 MpLog.info("[auto] second player present: speed 1");

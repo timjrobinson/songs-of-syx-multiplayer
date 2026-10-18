@@ -58,6 +58,7 @@ public final class SaveTransfer {
         Runnable r = pendingAfterLoad;
         pendingAfterLoad = null;
         syxmp.desync.SyncCoordinator.reset();
+        BattleSync.reset();
         syxmp.sync.ObjectPaths.invalidate();
         syxmp.dev.RndTrace.endLoad();
         syxmp.ui.MpCursors.clear();

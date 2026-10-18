@@ -86,6 +86,7 @@ public final class HostUtil {
             return;
         }
 
+        BattleSync.pauseVanillaThreads();
         Multiplayer.localServer = server;
         server.start();
         MpLog.info("hosting on port " + settings.port);

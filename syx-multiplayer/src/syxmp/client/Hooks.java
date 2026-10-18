@@ -54,6 +54,9 @@ public final class Hooks {
         SyncTemplates.registerAt(PatchTable.HOOK_TMP_PAUSE, suppressInMp);
         SyncTemplates.registerAt(PatchTable.HOOK_UPDATE_ONCE, suppressInMp);
 
+        // Battle workers: never threaded while in multiplayer.
+        SyncTemplates.registerAt(PatchTable.HOOK_BATTLE_UNPAUSE, (self, args) -> Multiplayer.active());
+
         // Pathfinder: synchronous only while in multiplayer.
         SyncTemplates.registerAt(PatchTable.HOOK_PATH_IS_PROCESSED, (self, args) -> Multiplayer.active());
         SyncTemplates.registerAt(PatchTable.HOOK_PATH_PREP, (self, args) -> Multiplayer.active());

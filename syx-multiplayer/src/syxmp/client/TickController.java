@@ -228,6 +228,7 @@ public final class TickController {
             // GAME.update(double) is the vanilla manual-tick entry
             // (GAME.java:235: SPEED.speedSet(1.0); game.update(seconds, 0)).
             GAME.update(TickRate.SUBSTEP_DS);
+            BattleSync.step(TickRate.SUBSTEP_DS);
             // One post-step draw fingerprints (seed, updateI, draws consumed):
             // it diverges as soon as any client's sim used the RNG differently.
             syxmp.desync.SyncCoordinator.recordSubStep(RND.rInt());
