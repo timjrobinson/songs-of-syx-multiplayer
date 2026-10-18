@@ -62,6 +62,17 @@ desync traces existed); not reproduced since. On any desync every client
 now writes `<logs>/syxmp-rnd-desync.txt` (last 80 sub-steps of RND call
 sites); `e2e/diffdesync.sh` shows the first divergent draw.
 
+### Main-menu join (20:21–20:29)
+
+`JOINER_MODE=menu run-pair.sh`: joiner with NO prior game joins from the main
+menu. Without the warm-up load it desynced at the second sub-step (humanoid
+AI plan continuation) although load probes matched — process-level singletons
+created by the first game differ from a process that has had a game before.
+With `SaveTransfer`'s warm-up load (first-game clients load the world twice)
+it ran 5 minutes clean at speed 5, identical updateI. Packaged as
+`syx-multiplayer/dist/SyxMultiplayer-0.2.0.zip` (`package.sh`); the mod
+auto-installs its -javaagent line on the first run and asks for a restart.
+
 ## Load-phase determinism (the big lesson of session 2)
 
 A joiner starts from LOADED state, so every client reloads at join points.
