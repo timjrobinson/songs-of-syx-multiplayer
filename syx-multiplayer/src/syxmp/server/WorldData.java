@@ -25,6 +25,8 @@ public final class WorldData {
 
     /** Timer value at which savedGame was captured. */
     public int savedGameTimer;
+    /** The session's RND seed (host-chosen); joiners must have it BEFORE loading. */
+    public long rngSeed;
 
     public WorldData(MultiplayerServer server) {
         this.server = server;

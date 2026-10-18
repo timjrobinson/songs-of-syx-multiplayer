@@ -37,7 +37,9 @@ public final class ClientLoadingState extends MpConnectionState {
                 long sentCmds = data.readLong();
                 boolean frozen = data.readBool();
                 int savedGameTimer = data.readInt();
+                long rngSeed = data.readLong();
                 byte[] save = data.readBytes();
+                session.rngSeed = rngSeed;
                 int cmdCount = data.readInt();
                 MpLog.info("world data: save " + save.length + "b at timer " + savedGameTimer
                         + ", " + cmdCount + " cmds, tickUntil " + tickUntil);

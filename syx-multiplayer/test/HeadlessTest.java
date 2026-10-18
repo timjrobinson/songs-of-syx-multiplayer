@@ -150,7 +150,7 @@ public final class HeadlessTest {
         settings.port = 35999;
         MultiplayerServer server = new MultiplayerServer(settings);
         server.gameVersion = game.VERSION.VERSION;
-        server.startFrom(1234, fakeSave);
+        server.startFrom(1234, fakeSave, 42L);
         TcpServerTransport transport = new TcpServerTransport(server);
         transport.start();
         server.start();

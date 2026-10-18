@@ -77,6 +77,12 @@ public final class VisualRnd {
         return (float) -Math.log(1 - rnd.nextFloat());
     }
 
+    /** Replacement for DEG.setRandom() in cosmetic callers. */
+    public static void degSetRandom() {
+        double a = rnd.nextDouble() * Math.PI * 2;
+        snake2d.util.datatypes.DEG.set(Math.cos(a), Math.sin(a));
+    }
+
     /** Replacement for LIST.rnd() in cosmetic callers. */
     public static Object listRnd(snake2d.util.sets.LIST<?> list) {
         return list.isEmpty() ? null : list.get(rnd.nextInt(list.size()));

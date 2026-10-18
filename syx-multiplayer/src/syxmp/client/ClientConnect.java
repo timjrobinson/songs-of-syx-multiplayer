@@ -29,6 +29,7 @@ public final class ClientConnect {
         session.joinPort = port;
         session.joinPassword = password;
         syxmp.ui.MpStatus.set("connecting to " + address + ":" + port + "...");
+        MpLog.info("connecting to " + address + ":" + port + " as " + username);
 
         Thread t = new Thread(() -> {
             try {

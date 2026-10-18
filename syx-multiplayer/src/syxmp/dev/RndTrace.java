@@ -114,12 +114,15 @@ public final class RndTrace {
     }
 
     /** Entry hook handler for every RND.r*() method. */
-    public static void onDraw() {
+    public static synchronized void onDraw() {
         if (done || out == null || !(Multiplayer.ticking || loadPhase))
             return;
         drawsInStep++;
         StackTraceElement[] st = new Throwable().getStackTrace();
         StringBuilder sb = new StringBuilder(160);
+        Thread t = Thread.currentThread();
+        if (!t.getName().equals("updater"))
+            sb.append("[T:").append(t.getName()).append("] ");
         int shown = 0;
         for (int i = 1; i < st.length && shown < 4; i++) {
             String c = st[i].getClassName();

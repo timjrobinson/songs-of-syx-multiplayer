@@ -43,6 +43,7 @@ public final class ServerLoadingState extends MpConnectionState {
         w.writeLong(server.commands.sentCmds());
         w.writeBool(server.freezeManager.frozen());
         w.writeInt(server.worldData.savedGameTimer);
+        w.writeLong(server.worldData.rngSeed);
         w.writeBytes(server.worldData.savedGame);
         w.writeInt(server.worldData.cmds.size());
         for (byte[] cmd : server.worldData.cmds)

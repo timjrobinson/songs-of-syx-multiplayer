@@ -56,7 +56,7 @@ public final class HostUtil {
 
         MultiplayerServer server = new MultiplayerServer(settings);
         server.gameVersion = VERSION.VERSION;
-        server.startFrom(0, capture.saveBytes);
+        server.startFrom(0, capture.saveBytes, session.rngSeed);
 
         LocalConnection[] pair = LocalConnection.paired(MainThread::enqueue, server.queue::enqueue);
         LocalConnection clientEnd = pair[0];

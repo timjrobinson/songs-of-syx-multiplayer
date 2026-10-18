@@ -55,10 +55,11 @@ public final class MultiplayerServer {
     }
 
     /** Initialize the clock from the hosting game's state. */
-    public void startFrom(int timer, byte[] savedGame) {
+    public void startFrom(int timer, byte[] savedGame, long rngSeed) {
         this.gameTimer = timer;
         worldData.savedGame = savedGame;
         worldData.savedGameTimer = timer;
+        worldData.rngSeed = rngSeed;
     }
 
     /** Transports register per-net-tick work (accept polling etc.) here. */

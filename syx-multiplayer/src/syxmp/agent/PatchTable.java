@@ -197,6 +197,8 @@ public final class PatchTable {
         // and sprite classes: e.g. settlement.battle.BannerRenderer draws 4
         // times in its constructor — only on the client whose first game it is.
         "*Renderer*", "*Sprite*", "*Particle*", "*Anim*",
+        // Gore pools: 5000 cosmetic objects randomized at SETT construction.
+        "settlement/thing/Gore*", "settlement/thing/ThingsGore",
     };
 
     private static final String[][] RND_METHODS = {
@@ -208,10 +210,14 @@ public final class PatchTable {
     };
 
     private static void addVisualRnd(PatchTable t) {
-        for (String cls : VISUAL_RND_CLASSES)
+        for (String cls : VISUAL_RND_CLASSES) {
             for (String[] m : RND_METHODS)
                 t.redirects.add(new CallRedirect(cls, null, "snake2d/util/rnd/RND", m[0], m[1],
                         "syxmp/client/VisualRnd", "*"));
+            // DEG.setRandom() draws from RND internally.
+            t.redirects.add(new CallRedirect(cls, null, "snake2d/util/datatypes/DEG", "setRandom", "()V",
+                    "syxmp/client/VisualRnd", "degSetRandom"));
+        }
     }
 
     static boolean classMatches(String pattern, String internalClassName) {
