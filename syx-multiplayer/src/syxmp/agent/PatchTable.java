@@ -92,11 +92,11 @@ public final class PatchTable {
                 "syxmp/client/Determinism", "afterTick"));
         // Pathfinder: SPath.resumeThreaded takes the async result if the
         // finder thread happens to be done (SPath.java:243) — timing
-        // dependent. Force the synchronous branch and stop queueing jobs.
-        t.hooks.add(new EntryHook("settlement/path/thread/FinderThread$ThreadPath",
-                "isProcessed", "(IIII)Z", HOOK_PATH_IS_PROCESSED));
+        // dependent. In MP the job runs synchronously inside prep (PathSync),
+        // so the result is always ready on the next resume, identically.
         t.hooks.add(new EntryHook("settlement/path/thread/FinderThread", "prep",
-                "(Lsettlement/path/path/SPath;IIIIZ)V", HOOK_PATH_PREP));
+                "(Lsettlement/path/path/SPath;Lsettlement/path/thread/FinderThread$ThreadPathJob;IIIIZ)V",
+                HOOK_PATH_PREP));
         // Battle AI worker threads run for every game in vanilla; in MP their
         // jobs run synchronously from the sub-step instead (BattleSync).
         t.hooks.add(new EntryHook("game/battle/thread/BattleThreads", "unpause", "(Z)V", HOOK_BATTLE_UNPAUSE));
