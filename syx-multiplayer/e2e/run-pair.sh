@@ -12,9 +12,9 @@ nohup setsid "$HERE/run-instance.sh" "$LOGDIR/host.log" 0 0 -Dsyxmp.autoload=1 -
 # JOINER_MODE=menu joins straight from the main menu (tests the menu join flow);
 # default loads its own save first and joins from in-game.
 if [ "${JOINER_MODE:-game}" = "menu" ]; then
-  JOINER_ARGS="-Dsyxmp.autojoinmenu=127.0.0.1:30599"
+  JOINER_ARGS="-Dsyxmp.autojoinmenu=127.0.0.1:30599"; JOINER_DELAY=75
 else
-  JOINER_ARGS="-Dsyxmp.autoload=1 -Dsyxmp.autojoin=127.0.0.1:30599"
+  JOINER_ARGS="-Dsyxmp.autoload=1 -Dsyxmp.autojoin=127.0.0.1:30599"; JOINER_DELAY=40
 fi
-nohup setsid "$HERE/run-instance.sh" "$LOGDIR/joiner.log" 1920 40 -Duser.home="$PROJ/.mp-test-home" $JOINER_ARGS "$@" >/dev/null 2>&1 &
+nohup setsid "$HERE/run-instance.sh" "$LOGDIR/joiner.log" 1920 $JOINER_DELAY -Duser.home="$PROJ/.mp-test-home" $JOINER_ARGS "$@" >/dev/null 2>&1 &
 echo "launched; logs in $LOGDIR"

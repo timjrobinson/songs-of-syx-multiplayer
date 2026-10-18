@@ -54,7 +54,9 @@ a too-broad visual-RNG wildcard (`*Anim*` caught `animal.Animal`).
 `run-pair.sh -Dsyxmp.autoact=1 -Dsyxmp.autospeed=5`: the host issues a synced
 player action every 10 s (immigration setting via AutoSync, clear-trees
 designation via ToolSync, speed toggles, staged stockpile via
-AutoSync+ToolSync). Speed 5, >5 minutes, zero desyncs so far. Earlier one
+AutoSync+ToolSync). Speed 5, 20+ minutes, 22 actions (4 clear-job designations, immigration
+settings, speed toggles, 4 staged stockpile areas), zero desyncs, identical
+updateI. Earlier one
 desync appeared ~8 s after a clear-job designation (before the rolling
 desync traces existed); not reproduced since. On any desync every client
 now writes `<logs>/syxmp-rnd-desync.txt` (last 80 sub-steps of RND call
