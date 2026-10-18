@@ -308,9 +308,11 @@ now broad (170 AutoSync verbs + 12 field writes + composite commands for
 events/deals/tribute/region buildings; `docs/sync-coverage.md` lists what is
 still local: tactical battle orders, world battle prompts, recruiting,
 autonomy, renames, single-room copy). Battle-view gate, autosave and
-Warn/Error are deterministic in MP. Pair soak with scripted actions: 5+ clean
-minutes at speed 5 (paused-step experiment desynced and is off; see
-HANDOFF3). Not yet play-tested by humans with the new table. Steam is opt-in
+Warn/Error are deterministic in MP. The intermittent real-play desync was
+gore on the cosmetic RND stream (fixed); a 27-minute pair soak at speed 5
+with 205 scripted synced actions then ran clean (paused-step experiment
+desynced and is off; see HANDOFF3). Not yet play-tested by humans with the
+new table. Steam is opt-in
 and untested. Distributable: `syx-multiplayer/package.sh` → `dist/*.zip`;
 version 0.3.0, protocol 6.
 

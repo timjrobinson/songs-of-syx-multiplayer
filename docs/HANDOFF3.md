@@ -91,8 +91,9 @@ this session executed; its sections are referenced below as "H2 §n".
 - Pair runs on this PC (`e2e/run-pair.sh -Dsyxmp.autoact=1 -Dsyxmp.autospeed=5`):
   with the paused step off, 5+ clean minutes at speed 5/1 with scripted
   synced actions, 198 classes patched, no patch failures. Before the gore
-  fix, longer runs desynced after 3-9 minutes; see the soak result noted in
-  the commit history / CLAUDE.md status for the post-fix run.
+  fix, longer runs desynced after 3-9 minutes every time; after it, a
+  27-minute lockstep soak (timer 97200, mostly speed 5, 205 scripted synced
+  actions, 43 speed changes) ran with zero desyncs.
 
 ## Not done / open
 
