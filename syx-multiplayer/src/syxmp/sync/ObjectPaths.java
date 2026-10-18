@@ -32,7 +32,25 @@ import syxmp.util.MpLog;
 public final class ObjectPaths {
 
     private static final int MAX_DEPTH = 12;
-    private static final int MAX_OBJECTS = 400_000;
+    private static final int MAX_OBJECTS = 600_000;
+    /**
+     * Subtrees never used as sync targets (normalized: array/list indices
+     * become []). Pruned so the index stays small and complete elsewhere;
+     * tuned from the "largest subtrees" log on a mid-size town.
+     */
+    private static final String[] SKIP_PATH_PREFIXES = {
+        "settlement.main.SETT#i.path", "settlement.main.SETT#i.things", "settlement.main.SETT#i.saver",
+        "settlement.main.SETT#i.eHandler", "settlement.main.SETT#i.projectiles", "settlement.main.SETT#i.tileMap",
+        "settlement.main.SETT#i.fog", "settlement.main.SETT#i.weather",
+        "game.GAME#game.saver", "game.GAME#game.battleThreads", "game.GAME#game.profiler",
+        "game.events.EVENTS#all[].coll", "game.faction.FACTIONS#self.npcManager",
+        "game.faction.FACTIONS#self.player.tech.",
+    };
+    /** Objects addressed by a serialization worker whose internals are never targets. */
+    private static final String[] SKIP_CHILDREN_OF = {
+        "init.race.Race", "init.resources.RESOURCE", "init.tech.TECH", "world.map.regions.Region",
+        "init.type.HCLASS", "init.type.HTYPE", "game.nobility.Noble",
+    };
     private static final int MAX_ELEMENTS = 512;
     private static final String[] ROOTS = {
         "settlement.main.SETT", "game.GAME", "game.faction.FACTIONS", "world.WORLD",
@@ -247,8 +265,34 @@ public final class ObjectPaths {
         } else if (!interesting(c)) {
             return;
         }
+        if (depth <= 4 && skippedPrefix(path))
+            return;
         paths.put(v, path);
-        queue.add(new Object[] {v, path, depth});
+        if (!skipChildren(c))
+            queue.add(new Object[] {v, path, depth});
+    }
+
+    private static boolean skippedPrefix(String path) {
+        String norm = path.replaceAll("\\[\\d+\\]", "[]");
+        for (String p : SKIP_PATH_PREFIXES)
+            if (norm.startsWith(p))
+                return true;
+        return false;
+    }
+
+    private static final Map<Class<?>, Boolean> skipChildrenCache = new HashMap<>();
+
+    private static boolean skipChildren(Class<?> c) {
+        Boolean b = skipChildrenCache.get(c);
+        if (b != null)
+            return b;
+        b = false;
+        for (Class<?> k = c; k != null && !b; k = k.getSuperclass())
+            for (String n : SKIP_CHILDREN_OF)
+                if (k.getName().equals(n))
+                    b = true;
+        skipChildrenCache.put(c, b);
+        return b;
     }
 
     private static boolean interesting(Class<?> c) {

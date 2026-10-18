@@ -37,6 +37,7 @@ public final class HeadlessTest {
         testAutoSyncTableResolves();
         testTransformerGameSpeed();
         testTransformerViewRedirect();
+        testFieldAndUiRedirects();
         testJoinFlowOverTcp();
         System.out.println(failures == 0 ? "ALL TESTS PASSED" : failures + " FAILURES");
         System.exit(failures == 0 ? 0 : 1);
@@ -149,6 +150,44 @@ public final class HeadlessTest {
     }
 
     /** Verify VIEW.update's game.update call was rewritten to TickController. */
+    /** Count INVOKESTATIC calls into {@code owner} across all methods of the transformed class. */
+    static int countCallsInto(byte[] patched, String ownerPrefix) {
+        int[] n = { 0 };
+        new ClassReader(patched).accept(new ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String desc, String sig, String[] ex) {
+                return new MethodVisitor(Opcodes.ASM9) {
+                    @Override
+                    public void visitMethodInsn(int op, String owner, String mname, String mdesc, boolean itf) {
+                        if (op == Opcodes.INVOKESTATIC && owner.startsWith(ownerPrefix))
+                            n[0]++;
+                    }
+                };
+            }
+        }, 0);
+        return n[0];
+    }
+
+    /** PUTFIELD redirects (FieldSync) and UI call-site redirects (UiRedirects) reach the bytecode. */
+    static void testFieldAndUiRedirects() throws Exception {
+        System.out.println("testFieldAndUiRedirects");
+        byte[] sel = transform("view/battle/UISelection");
+        check(countCallsInto(sel, "syxmp/sync/FieldSync") >= 5,
+                "UISelection division-setting writes go through FieldSync");
+        byte[] breeder = transform("settlement/room/service/breeder/Gui$2");
+        check(countCallsInto(breeder, "syxmp/sync/FieldSync") >= 1,
+                "breeder Gui$2 prosecute write goes through FieldSync");
+        byte[] pop = transform("view/sett/ui/standing/CatPopulationGrowth$8");
+        check(countCallsInto(pop, "syxmp/sync/UiRedirects") >= 1,
+                "CatPopulationGrowth$8 birth-limit RMapInt.set goes through UiRedirects");
+        byte[] pop2 = transform("view/sett/ui/standing/CatPopulationGrowth$9");
+        check(countCallsInto(pop2, "syxmp/sync/UiRedirects") >= 1,
+                "CatPopulationGrowth$9 ArrayInt.set goes through UiRedirects");
+        byte[] rdb = transform("world/region/building/RDBuilding");
+        check(countCallsInto(rdb, "syxmp/client/Determinism") >= 1,
+                "RDBuilding preview-level reads go through Determinism.rdLevel");
+    }
+
     static void testTransformerViewRedirect() throws Exception {
         System.out.println("testTransformerViewRedirect");
         byte[] patched = transform("view/main/VIEW");
