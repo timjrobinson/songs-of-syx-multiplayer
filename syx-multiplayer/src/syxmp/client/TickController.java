@@ -245,6 +245,7 @@ public final class TickController {
             return;
         int seed = mixSeed(session.rngSeed ^ 0x6C0AD5EEDL, timer);
         syxmp.dev.RndTrace.beginLoad(timer);
+        DetRnd.reset();
         RND.setSeed(seed);
         MpLog.info("seeded RND for load at timer " + timer + " seed=" + Integer.toHexString(seed)
                 + " session=" + Long.toHexString(session.rngSeed));

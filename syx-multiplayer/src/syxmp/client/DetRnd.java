@@ -12,9 +12,19 @@ import java.util.Random;
  */
 public final class DetRnd {
 
-    private static final Random rnd = new Random(0x5EED5EEDL);
+    private static Random rnd = new Random(0x5EED5EEDL);
 
     private DetRnd() {
+    }
+
+    /**
+     * Restart the stream. Called before every multiplayer game load so the
+     * tables built during that load (RANMAP ran1/ran2 in GUTIL) are the same
+     * whether this is the process's first game or its fifth — a first-game
+     * joiner otherwise gets different tables than a host that has reloaded.
+     */
+    public static void reset() {
+        rnd = new Random(0x5EED5EEDL);
     }
 
     public static int rInt(int max) {

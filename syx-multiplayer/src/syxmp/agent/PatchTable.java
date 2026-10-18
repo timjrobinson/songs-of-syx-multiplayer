@@ -136,7 +136,8 @@ public final class PatchTable {
         addVisualRnd(t);
         // Per-process random lookup tables built in static initializers get a
         // fixed seed so every client builds the same table.
-        for (String cls : new String[] {"util/updating/TileUpdater", "util/data/RANMAP"})
+        // (TileUpdater's table is built in <clinit> and handled by ClinitRnd.)
+        for (String cls : new String[] {"util/data/RANMAP"})
             for (String[] m : new String[][] {{"rInt", "(I)I"}, {"rInt", "()I"}, {"rFloat", "()F"}, {"rBoolean", "()Z"}})
                 t.redirects.add(new CallRedirect(cls, null, "snake2d/util/rnd/RND", m[0], m[1],
                         "syxmp/client/DetRnd", "*"));
