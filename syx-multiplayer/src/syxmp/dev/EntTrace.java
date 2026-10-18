@@ -29,6 +29,18 @@ public final class EntTrace {
             sb.setLength(0);
             sb.append("E ").append(e.id()).append(' ').append(args[0])
               .append(" @").append(e.body().cX()).append(',').append(e.body().cY());
+            if (self instanceof settlement.entity.humanoid.Humanoid h) {
+                // velocity, AI state and current path node: the inputs of the next move
+                sb.append(" v=").append((float) h.speed.x()).append(',').append((float) h.speed.y());
+                if (h.ai() instanceof settlement.entity.humanoid.ai.main.AIManager m) {
+                    Object st = m.state();
+                    sb.append(" s=").append(st == null ? "-" : st.getClass().getSimpleName());
+                    sb.append(" t=").append(m.stateTimer);
+                    settlement.path.path.SPath p = m.path();
+                    sb.append(" p=").append(p.getCurrentI()).append('/').append(p.length())
+                      .append(p.isSuccessful() ? "" : "!").append('@').append(p.x()).append(',').append(p.y());
+                }
+            }
             if (self instanceof settlement.entity.animal.Animal) {
                 if (fState == null) {
                     fState = ReflectUtil.field(self.getClass(), "state");

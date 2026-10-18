@@ -57,12 +57,38 @@ public final class PathSync {
             fFull.set(t, full);
             boolean ok = (Boolean) mDoJob.invoke(job, pather, finder, t);
             fStatus.set(t, (byte) (ok ? 3 : 2));
+            if (syxmp.dev.RndTrace.ENABLED)
+                syxmp.dev.RndTrace.mark(describe(t, sx, sy, dx, dy, full, ok));
             return true;
         } catch (ReflectiveOperationException | RuntimeException e) {
             broken = true;
             MpLog.err("synchronous pathfinding failed; falling back to vanilla thread", e);
             return false;
         }
+    }
+
+    /** Dev trace: request + result path (length, destination, node hash). */
+    private static String describe(FinderThread.ThreadPath t, int sx, int sy, int dx, int dy, boolean full, boolean ok) {
+        StringBuilder sb = new StringBuilder(96);
+        sb.append("P ").append(sx).append(',').append(sy).append("->").append(dx).append(',').append(dy)
+          .append(full ? " full" : "").append(ok ? " ok" : " FAIL");
+        try {
+            snake2d.PathGame.PathFancy path = t.path;
+            int old = path.getCurrentI();
+            path.setCurrentI(0);
+            int h = 17, n = 0;
+            while (path.hasNext()) {
+                h = h * 31 + path.x() * 7919 + path.y();
+                n++;
+                path.setNext();
+            }
+            path.setCurrentI(old);
+            sb.append(" len=").append(path.length()).append(" nodes=").append(n).append(" dest=")
+              .append(t.destX).append(',').append(t.destY).append(" h=").append(Integer.toHexString(h));
+        } catch (RuntimeException e) {
+            sb.append(" ?");
+        }
+        return sb.toString();
     }
 
     private static void bind(Class<?> jobClass) throws ReflectiveOperationException {

@@ -54,6 +54,8 @@ public final class PatchTable {
     /** GAME.Warn / GAME.Error branch on the local DEVELOPER/DEBUG launcher flags: uniform in MP. */
     public static final int HOOK_GAME_WARN = 19;
     public static final int HOOK_GAME_ERROR = 20;
+    /** Dev: short-range pathfinder requests (with -Dsyxmp.enttrace=1). */
+    public static final int HOOK_SPATH_FIND = 21;
 
     // Sync-method hooks (bound to SyncMethod handlers by SyxSync) start at 100.
     public static final int HOOK_IMMIGRATION_ADMIT = 100;
@@ -187,6 +189,13 @@ public final class PatchTable {
         if ("1".equals(System.getProperty("syxmp.enttrace"))) {
             t.hooks.add(new EntryHook("settlement/entity/humanoid/Humanoid", "update", "(D)Z", HOOK_ENT_UPDATE));
             t.hooks.add(new EntryHook("settlement/entity/animal/Animal", "update", "(D)Z", HOOK_ENT_UPDATE));
+            t.redirects.add(new CallRedirect("settlement/path/path/SPath", null,
+                    "settlement/path/finders/SPathFinder", "find", "(IIIIZ)Lsnake2d/PathTile;",
+                    "syxmp/dev/PathProbe", "find"));
+            t.redirects.add(new CallRedirect("settlement/path/finders/SFinderRND", null,
+                    "settlement/path/components/finder/SCompFinder", "fill",
+                    "(III)Lsettlement/path/components/finder/SCompFinder$SCompPath;",
+                    "syxmp/dev/PathProbe", "fill"));
         }
 
         // Dev-only RND call-site tracing (zero cost unless enabled: hooks absent).
@@ -324,8 +333,11 @@ public final class PatchTable {
         // and sprite classes: e.g. settlement.battle.BannerRenderer draws 4
         // times in its constructor — only on the client whose first game it is.
         "*Renderer*", "*Sprite*", "*Particle*", "*Animation*",
-        // Gore pools: 5000 cosmetic objects randomized at SETT construction.
-        "settlement/thing/Gore*", "settlement/thing/ThingsGore",
+        // NOT gore: ThingsGore places blood/flesh at RND tile offsets
+        // (ThingsGore.java:84,152) and SFINDERS.isGoodTileToStandOn reads
+        // things per tile — gore on a per-client stream desynced random
+        // destinations (session 3 finding). Its construction-time tables draw
+        // under the deterministic load seeds, which is fine.
     };
 
     private static final String[][] RND_METHODS = {

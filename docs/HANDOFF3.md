@@ -31,6 +31,25 @@ this session executed; its sections are referenced below as "H2 §n".
   `-Dsyxmp.pausedstep=1` for whoever wants to find the unsaved state; the
   UI-staleness-while-paused caveat from H2 §1 stands.
 
+- **The intermittent "real play" desync (session 2's open item) is found.**
+  Symptom: minutes into a session a citizen walks a different route on the
+  two clients with no RND difference before it. Chased with the entity
+  trace (`-Dsyxmp.enttrace=1`, now logging velocity, AI state and path node
+  per humanoid plus every short-range (`S`), long-range (`P`) and
+  component-flood (`C`) path request/result) and a 400-sub-step ring: the
+  first difference is the *destination* of a short-range path request from
+  `SFinderRND.get`, with identical component list and identical RND draws.
+  `SFINDERS.isGoodTileToStandOn` rejects tiles with a Thing on them
+  (`THINGS().getFirst`), and gore is a Thing placed at `cx + RND.rInt0(32)`
+  (`ThingsGore.java:84,152`). Session 2 had moved `settlement/thing/Gore*`
+  to the per-client cosmetic stream (`VisualRnd`), so blood landed on
+  different tiles per client and biased the random pick. Fix: gore is back
+  on the shared RND (its construction-time tables draw under the load
+  seeds). Rule added to CLAUDE.md: a class may only go on the cosmetic
+  stream if nothing it randomizes is readable by the sim — Things are.
+- Dev tooling grew for this: `PathProbe` (S/P/C marks), `EntTrace` fields,
+  `RndTrace.mark` into the ring, `-Dsyxmp.rndtrace.ring=N`.
+
 ### Sync coverage (H2 §2) — the main work
 - Three complete surveys of the UI → sim mutation points (rooms, stats/laws/
   military, world/factions/events); condensed in `docs/sync-coverage.md`.
@@ -71,7 +90,9 @@ this session executed; its sections are referenced below as "H2 §n".
 - Headless suite green (transformer, join flow, table resolution).
 - Pair runs on this PC (`e2e/run-pair.sh -Dsyxmp.autoact=1 -Dsyxmp.autospeed=5`):
   with the paused step off, 5+ clean minutes at speed 5/1 with scripted
-  synced actions, 198 classes patched, no patch failures.
+  synced actions, 198 classes patched, no patch failures. Before the gore
+  fix, longer runs desynced after 3-9 minutes; see the soak result noted in
+  the commit history / CLAUDE.md status for the post-fix run.
 
 ## Not done / open
 

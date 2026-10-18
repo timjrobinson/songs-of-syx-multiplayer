@@ -57,11 +57,16 @@ public final class SyxAgent {
             syxmp.client.TickController.seedAfterCreate();
             return false;
         });
-        if ("1".equals(System.getProperty("syxmp.enttrace")))
+        if ("1".equals(System.getProperty("syxmp.enttrace"))) {
             SyncTemplates.registerAt(PatchTable.HOOK_ENT_UPDATE, (self, a) -> {
                 syxmp.dev.EntTrace.onUpdate(self, a);
                 return false;
             });
+            SyncTemplates.registerAt(PatchTable.HOOK_SPATH_FIND, (self, a) -> {
+                syxmp.dev.RndTrace.mark("S " + a[0] + "," + a[1] + "->" + a[2] + "," + a[3] + (Boolean.TRUE.equals(a[4]) ? " full" : ""));
+                return false;
+            });
+        }
         if (syxmp.dev.RndTrace.ENABLED)
             SyncTemplates.registerAt(PatchTable.HOOK_RND_DRAW, (self, a) -> {
                 syxmp.dev.RndTrace.onDraw();

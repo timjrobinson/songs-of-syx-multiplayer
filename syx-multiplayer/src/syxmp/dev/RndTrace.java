@@ -116,7 +116,13 @@ public final class RndTrace {
     }
 
     public static synchronized void mark(String line) {
-        if (!ENABLED || out == null)
+        if (!ENABLED)
+            return;
+        // Entity/state marks go into the rolling ring too, so a desync dump
+        // shows the first diverging entity before the first diverging draw.
+        if (Multiplayer.ticking && ringCur != null && ringCur.length() < 2_000_000)
+            ringCur.append(line).append('\n');
+        if (out == null)
             return;
         try {
             out.write(line + "\n");

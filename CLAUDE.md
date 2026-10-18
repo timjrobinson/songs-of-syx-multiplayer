@@ -320,7 +320,10 @@ version 0.3.0, protocol 6.
   per-sub-step/per-command reseed. New cosmetic RND users found by the trace go
   to `VisualRnd` via `PatchTable.VISUAL_RND_CLASSES` (CallRedirect). Audit any
   wildcard against the jar's class list first — `*Anim*` once matched
-  `settlement.entity.animal.Animal` and desynced every animal.
+  `settlement.entity.animal.Animal` and desynced every animal. A class may only
+  be cosmetic if NOTHING it randomizes is readable by the sim: gore is a Thing,
+  `isGoodTileToStandOn` reads Things per tile, and gore on the cosmetic stream
+  caused the intermittent real-play desync of sessions 2-3 (`docs/HANDOFF3.md`).
 - Static initializers draw from `ClinitRnd` (automatic for all game classes),
   per-game instance tables from `DetRnd` (reset at every MP load), game
   construction from the two deterministic load seeds (`TickController.
