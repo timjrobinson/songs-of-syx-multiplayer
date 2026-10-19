@@ -161,7 +161,7 @@ synced methods, playing the role Harmony plays for RimWorld.
 ## Developing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the PR workflow and how
-releases are cut, and `CLAUDE.md` for the technical map (game internals,
+releases are cut (locally, with `release.sh`), and `CLAUDE.md` for the technical map (game internals,
 port design decisions, determinism rules). Deep-dive docs live in `docs/`:
 `HANDOFF4.md` is the latest session summary, `sync-coverage.md` lists every
 synced action, `sos-internals.md` and `rimworld-mp-architecture.md` are the

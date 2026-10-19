@@ -14,4 +14,4 @@
 - [ ] Docs updated if behaviour changed (`README.md`, `docs/sync-coverage.md`, `syx-multiplayer/mod/README.txt`)
 - [ ] Play-tested with two instances (`e2e/run-pair.sh`) if the change touches sync or the tick loop
 
-Merging this PR into `main` publishes a release with the patch version bumped automatically. Add `[skip release]` to the merge commit message if this should not ship on its own.
+There is no CI build (the game jar is proprietary), so the local test run above is the gate. After merging, a maintainer runs `syx-multiplayer/release.sh` on `main` to publish the next version.
