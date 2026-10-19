@@ -53,8 +53,11 @@ public final class Determinism {
      * does not pause the settlement resources on their machine only.
      */
     public static boolean battleViewActive(view.battle.BattleView b) {
+        // In MP the local view state must not reach the sim; a GENERATED
+        // battle (BattleState set by the synced engage on every client) is
+        // the deterministic equivalent of "the battle view is open".
         if (Multiplayer.active())
-            return false;
+            return syxmp.sync.GenBattleSync.inGeneratedBattle();
         return b.isActive();
     }
 

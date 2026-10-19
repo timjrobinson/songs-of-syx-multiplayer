@@ -40,6 +40,8 @@ public final class SaveTransfer {
     /** Number of games created in this process (script instances). */
     public static volatile int gamesCreated;
     private static Runnable pendingAfterLoad;
+    /** Runs once after a vanilla (non-transfer) load inside the session completes (GenBattleSync). */
+    public static volatile Runnable afterVanillaLoad;
     private static byte[] lastApplied;
     private static boolean warmupDone;
 
@@ -78,6 +80,7 @@ public final class SaveTransfer {
         BattleSync.reset();
         syxmp.sync.BattleOrderSync.reset();
         syxmp.sync.WorldBattleSync.reset();
+        syxmp.sync.GenBattleSync.reset();
         syxmp.sync.ObjectPaths.invalidate();
         syxmp.dev.RndTrace.endLoad();
         syxmp.ui.MpCursors.clear();
@@ -89,6 +92,10 @@ public final class SaveTransfer {
         snake2d.util.rnd.RND.setSeed(TickController.mixSeed(Multiplayer.session.rngSeed ^ 0x2B1D5EL, TickController.timer));
         if (r != null)
             r.run();
+        Runnable v = afterVanillaLoad;
+        afterVanillaLoad = null;
+        if (v != null)
+            v.run();
     }
 
     private SaveTransfer() {

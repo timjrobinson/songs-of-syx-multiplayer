@@ -57,6 +57,8 @@ public final class SyncActions {
     /** RoomToolSync: tools with UI-local state. */
     static final byte HOME_ASSIGN = 16, RACE_ASSIGN = 17, HOME_ODD = 18, HOSPITAL_FETCH = 19,
             MOVE_AUTO = 20, MOVE_SET = 21, MOVE_REMOVE = 22, MOVE_PASTE = 23, REFURNISH = 24;
+    /** GenBattleSync: generated tactical battle start/conclude/retreat/restart. */
+    static final byte GEN_BATTLE = 25;
     /** World battle prompt decisions (WorldBattleSync). */
     static final byte WORLD_BATTLE = 6;
 
@@ -490,6 +492,7 @@ public final class SyncActions {
             case NAME_SET, COLOR_SET, MARK_ADD, MARK_REMOVE -> NameSync.execute(kind, data);
             case HOME_ASSIGN, RACE_ASSIGN, HOME_ODD, HOSPITAL_FETCH, MOVE_AUTO, MOVE_SET, MOVE_REMOVE, MOVE_PASTE, REFURNISH ->
                 RoomToolSync.execute(kind, data);
+            case GEN_BATTLE -> GenBattleSync.execute(data);
             default -> MpLog.err("unknown action kind " + kind);
         }
     }

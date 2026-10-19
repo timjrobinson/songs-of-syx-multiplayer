@@ -80,8 +80,11 @@ AIModule_Prisoner, DIP, ROPINION, RD, EVENTS, NOBLES; depth 12).
 2. ~~World battle prompts~~ — synced in session 4 (`WorldBattleSync`): the
    prompt opens in afterTick on every client and pauses the synced clock;
    close/auto/retreat/accept/occupy/abandon/puppet (+mercy) are commands
-   addressed to the current prompt. **Engage auto-resolves in MP** (the
-   generated tactical battle is a separate saved game). Auto-resolve RND is
+   addressed to the current prompt. **Engage** runs the generated tactical
+   battle in lockstep (`GenBattleSync`): generation inside the command on
+   every client, `BattleState.update` from the sub-step, Start / result
+   close / retreat / restart as commands, and the `__beforeBattle` /
+   `__battle` loads handled like join-point reloads. Auto-resolve RND is
    consumed inside the command (reseeded).
 3. ~~Recruiting / mercenaries / create army~~ — synced in session 4
    (`ArmySync`): entry hooks on the click handlers (`ArmyRecruit$3`,
@@ -102,9 +105,10 @@ AIModule_Prisoner, DIP, ROPINION, RD, EVENTS, NOBLES; depth 12).
    marks, the player banner (BG/FG/border/pole) and division banners;
    unknown colours (profile colour masks) stay local. Marks: `UIMiniHotSpots$1
    .placeFirst` hook → MARK_ADD (random colour inside the command),
-   `SettMark.remove` → MARK_REMOVE. The faction name itself
-   (`FACTIONS.player().name`, edited by the input sprite internally) is
-   still local — cosmetic.
+   `SettMark.remove` → MARK_REMOVE. The faction name (edited inside
+   `StringInputSprite` itself) and the city division name copied by the
+   division editor are synced too (`inputAdd*`/`inputClear` redirects send
+   the full text; `UIDivEditor$3` uses the clear/add pair).
 6. ~~Room copy with UI state~~ — synced (`RoomToolSync` + `ToolSync`):
    FIXED tool commands for `Copier$7` / `SavedPrintsPlacer$5` carry the
    source room, structure, walls flag, blueprint swap, rotation (and for

@@ -78,6 +78,12 @@ public final class PatchTable {
     public static final int HOOK_MARK_ADD = 36;
     /** UIRoomPlacer.init(RoomInstanceImp): refurnish removes the room and re-stages the shared placer. */
     public static final int HOOK_REFURNISH = 37;
+    /** GameLoader.set() inside a session: a vanilla load (battle exit/restart) is handled like a join-point reload. */
+    public static final int HOOK_GAME_LOADER_SET = 38;
+    /** Generated battles (GenBattleSync): IDeploy / ILiveConclude bookkeeping and the result screen's close. */
+    public static final int HOOK_IDEPLOY_UPDATE = 39;
+    public static final int HOOK_CONCLUDE_UPDATE = 40;
+    public static final int HOOK_CONCLUDE_CLOSE = 41;
 
     // Sync-method hooks (bound to SyncMethod handlers by SyxSync) start at 100.
     public static final int HOOK_IMMIGRATION_ADMIT = 100;
@@ -414,6 +420,29 @@ public final class PatchTable {
                 "(Lsettlement/room/main/Room$RoomInstanceImp;)V", HOOK_REFURNISH));
         t.redirects.add(new CallRedirect(mop + "*", null, "init/resources/RBIT$RBITImp", "or",
                 "(Linit/resources/RBIT;)Linit/resources/RBIT$RBITImp;", "syxmp/sync/UiRedirects", "rbitOr"));
+
+        // Generated tactical battles (GenBattleSync).
+        t.hooks.add(new EntryHook("game/save/GameLoader", "set", "()V", HOOK_GAME_LOADER_SET));
+        t.hooks.add(new EntryHook("view/battle/IDeploy", "update", "(F)Z", HOOK_IDEPLOY_UPDATE));
+        t.hooks.add(new EntryHook("game/battle/state/BattleState$ILiveConclude", "update", "(F)Z", HOOK_CONCLUDE_UPDATE));
+        t.hooks.add(new EntryHook("game/battle/state/BattleState$ILiveConclude$1", "close", "()V", HOOK_CONCLUDE_CLOSE));
+        String bs = "game/battle/state/BattleState", gbs = "syxmp/sync/GenBattleSync";
+        t.redirects.add(new CallRedirect("view/battle/BattleView", "update", bs, "update", "(D)V", gbs, "viewUpdate"));
+        t.redirects.add(new CallRedirect("view/battle/IDeploy*", null, bs, "deploy", "()V", gbs, "deploy"));
+        t.redirects.add(new CallRedirect("view/battle/*", null, bs, "liveRetreat", "()V", gbs, "liveRetreat"));
+        t.redirects.add(new CallRedirect("view/battle/*", null, bs, "reloadBattle", "()V", gbs, "reloadBattle"));
+
+        // The faction name is edited inside the input sprite itself (UIProfile.java:84 text() returns the
+        // sim Str), and the city division editor copies its name into DivInfo (UIDivEditor.java:150).
+        String sis = "snake2d/util/sprite/text/StringInputSprite";
+        t.redirects.add(new CallRedirect(sis, null, strOwner, "add", "(C)L" + strOwner + ";", "syxmp/sync/NameSync", "inputAddChar"));
+        t.redirects.add(new CallRedirect(sis, null, strOwner, "add", "(Ljava/lang/CharSequence;)L" + strOwner + ";",
+                "syxmp/sync/NameSync", "inputAdd"));
+        t.redirects.add(new CallRedirect(sis, null, strOwner, "clear", "()L" + strOwner + ";", "syxmp/sync/NameSync", "inputClear"));
+        t.redirects.add(new CallRedirect("view/ui/div/UIDivEditor$3", null, strOwner, "clear", "()L" + strOwner + ";",
+                "syxmp/sync/NameSync", "strClear"));
+        t.redirects.add(new CallRedirect("view/ui/div/UIDivEditor$3", null, strOwner, "add", "(Ljava/lang/CharSequence;)L" + strOwner + ";",
+                "syxmp/sync/NameSync", "strAdd"));
 
         // Direct field assignments from UI code (AutoSyncTable.FIELDS).
         for (String[] f : AutoSyncTable.FIELDS)

@@ -42,6 +42,7 @@ public final class HeadlessTest {
         testBattleOrderHooks();
         testWorldBattleRedirects();
         testUiStateHooks();
+        testGeneratedBattleHooks();
         testBattleOrderCodec();
         testJoinFlowOverTcp();
         System.out.println(failures == 0 ? "ALL TESTS PASSED" : failures + " FAILURES");
@@ -139,6 +140,14 @@ public final class HeadlessTest {
             byte[] out = t.transform(null, internalName, null, null, original);
             check(out != null, internalName + " was transformed");
             return out;
+        }
+    }
+
+    /** Like transform() but null when the patch table does not touch the class. */
+    static byte[] transformOrNull(String internalName) throws Exception {
+        try (InputStream in = ClassLoader.getSystemResourceAsStream(internalName + ".class")) {
+            byte[] original = in.readAllBytes();
+            return new MpTransformer(PatchTable.build()).transform(null, internalName, null, null, original);
         }
     }
 
@@ -308,6 +317,29 @@ public final class HeadlessTest {
         check(colour == 3, "GColorPicker: setRed/Green/Blue redirected (" + colour + ")");
         check(countCallsInto(transform("view/sett/ui/right/UIMiniHotSpots$Panel$2"), "syxmp/sync/NameSync") == 1,
                 "UIMiniHotSpots: mark remove redirected");
+    }
+
+    /** Generated battles: loader/deploy/conclude hooks, the per-frame state update and the battle buttons redirected. */
+    static void testGeneratedBattleHooks() throws Exception {
+        System.out.println("testGeneratedBattleHooks");
+        for (String c : new String[] {"game/save/GameLoader", "view/battle/IDeploy",
+                "game/battle/state/BattleState$ILiveConclude", "game/battle/state/BattleState$ILiveConclude$1"})
+            check(countCallsInto(transform(c), "syxmp/agent/SyncTemplates") >= 1, c + " is hooked");
+        check(countCallsInto(transform("view/battle/BattleView"), "syxmp/sync/GenBattleSync") == 1,
+                "BattleView: BattleState.update redirected to the sub-step");
+        check(countCallsInto(transform("view/battle/IDeploy$1"), "syxmp/sync/GenBattleSync") == 1, "IDeploy: deploy redirected");
+        int panel = 0;
+        for (String c : new String[] {"view/battle/BattlePanel$11$1", "view/battle/BattlePanel$12$1",
+                "view/battle/BattlePanel$12", "view/battle/UIBattleResult$3"}) {
+            byte[] patched = transformOrNull(c);
+            if (patched != null)
+                panel += countCallsInto(patched, "syxmp/sync/GenBattleSync");
+        }
+        check(panel == 3, "BattlePanel/UIBattleResult: retreat + 2x restart redirected (" + panel + ")");
+        check(countCallsInto(transform("snake2d/util/sprite/text/StringInputSprite"), "syxmp/sync/NameSync") >= 3,
+                "StringInputSprite: Str mutators redirected");
+        check(countCallsInto(transform("view/ui/div/UIDivEditor$3"), "syxmp/sync/NameSync") == 4,
+                "UIDivEditor$3: division name copy (and its UI scratch copy) redirected");
     }
 
     /** The by-value codec for DivFormationImp / BattleOrderTask round-trips every field Locked.set copies. */

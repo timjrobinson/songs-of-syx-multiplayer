@@ -110,6 +110,20 @@ public final class Hooks {
         SyncTemplates.registerAt(PatchTable.HOOK_MOVE_PASTE, syxmp.sync.RoomToolSync::movePastePlace);
         SyncTemplates.registerAt(PatchTable.HOOK_MARK_ADD, syxmp.sync.NameSync::markPlace);
         SyncTemplates.registerAt(PatchTable.HOOK_REFURNISH, syxmp.sync.RoomToolSync::refurnishInit);
+        // Generated battles (GenBattleSync) and in-session vanilla loads.
+        SyncTemplates.registerAt(PatchTable.HOOK_GAME_LOADER_SET, (self, args) -> {
+            if (Multiplayer.active() && Multiplayer.executingCmds && TickController.inLockstep()) {
+                MpLog.info("game load scheduled by a command at timer " + TickController.timer + ": reloading");
+                Multiplayer.reloading = true;
+                TickController.yieldForReload = true;
+            } else if (Multiplayer.active() && !Multiplayer.reloading) {
+                MpLog.err("game load outside a command while in a session (quickload?) — this client will desync");
+            }
+            return false;
+        });
+        SyncTemplates.registerAt(PatchTable.HOOK_IDEPLOY_UPDATE, syxmp.sync.GenBattleSync::deployUpdate);
+        SyncTemplates.registerAt(PatchTable.HOOK_CONCLUDE_UPDATE, syxmp.sync.GenBattleSync::concludeUpdate);
+        SyncTemplates.registerAt(PatchTable.HOOK_CONCLUDE_CLOSE, syxmp.sync.GenBattleSync::concludeClose);
         SyncTemplates.registerAt(PatchTable.HOOK_TOOL_MULTI_PLACE,
                 (self, args) -> syxmp.sync.ToolSync.multiPlace(self));
 

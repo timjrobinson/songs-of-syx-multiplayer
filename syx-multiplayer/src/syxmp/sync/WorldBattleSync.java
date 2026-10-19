@@ -49,7 +49,7 @@ import world.battle.spec.WBattleSpec;
  */
 public final class WorldBattleSync {
 
-    private static final byte CLOSE = 0, AUTO = 1, RETREAT = 2, ACCEPT = 3, OCCUPY = 4, ABANDON = 5, PUPPET = 6;
+    private static final byte CLOSE = 0, AUTO = 1, RETREAT = 2, ACCEPT = 3, OCCUPY = 4, ABANDON = 5, PUPPET = 6, ENGAGE = 7;
 
     private static UIWBattlePrompt prompt;
     /** The spec/result handed to the UI by the sim; stays addressable after CLOSE until a decision executes. */
@@ -68,10 +68,20 @@ public final class WorldBattleSync {
         return decisionPending;
     }
 
+    /** A new GAME: forget prompts of the old one — unless the recorded prompt belongs to the new VIEW
+     *  (a battle result opened inside GameLoader.doAfterSet, before the first frame of the new game). */
     public static void reset() {
-        prompt = null;
-        current = null;
-        paused = false;
+        boolean keep = false;
+        try {
+            keep = prompt != null && prompt == view.main.VIEW.world().UI.battle && prompt.isBusty();
+        } catch (RuntimeException e) {
+            // no view yet
+        }
+        if (!keep) {
+            prompt = null;
+            current = null;
+            paused = false;
+        }
         decisionPending = false;
         hasPendingMercy = false;
     }
@@ -181,9 +191,7 @@ public final class WorldBattleSync {
             s.engage();
             return;
         }
-        GAME.Notify("Multiplayer: manual battles are not available, auto-resolving instead.");
-        MpLog.info("engage requested in MP: auto-resolving");
-        send(begin(AUTO), "engage->auto");
+        send(begin(ENGAGE), "engage");
     }
 
     public static void auto(WBattleSpec s) {
@@ -328,6 +336,15 @@ public final class WorldBattleSync {
             AD.stats().mercy().incD(FACTIONS.player(), m);
         switch (kind) {
             case AUTO -> ((WBattleSpec) target).auto();
+            case ENGAGE -> {
+                // BattleState.setGenerate: save __beforeBattle, generate the battle map in place,
+                // save __battle, open the battle view (BattleState.java:54). Vanilla then
+                // holds the game with a modal Start button; the synced clock pauses instead.
+                MpLog.info("engage: generating tactical battle at timer " + TickController.timer);
+                ((WBattleSpec) target).engage();
+                TickController.speed = 0;
+                paused = false;
+            }
             case RETREAT -> ((WBattleSpec) target).retreat();
             case ACCEPT -> ((WBattleResult) target).accept(readArr(r), readArr(r));
             case OCCUPY, ABANDON, PUPPET -> {

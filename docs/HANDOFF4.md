@@ -106,10 +106,49 @@ state blob). `docs/sync-coverage.md` items 3-7 are now synced:
   tactical battles (engage auto-resolves); profile colour masks (ColorPop,
   local profile data).
 
+### Manual (generated) battles, faction name, division name (third part)
+Version 0.3.3, protocol 9. "No desyncs for anything real players use":
+- `sync/GenBattleSync`: the world prompt's **Engage** now really engages.
+  ENGAGE executes `spec.engage()` on every client (BattleState.setGenerate:
+  save `__beforeBattle`, generate in place, save `__battle`, open the battle
+  view) and sets the synced speed to 0 (vanilla holds the game with the
+  modal IDeploy). `BattleState.update` is redirected out of BattleView
+  (per frame, wall-clock ds) and run from the lockstep sub-step. Start
+  (IDeploy → `deploy()`), the result screen's close (`ILiveConclude$1.close`
+  → `liveResolve`), retreat and restart are GEN_BATTLE commands; the
+  IDeploy/ILiveConclude interrupters are recorded by hooks on their update()
+  so non-issuers hide theirs (`ILiveConclude.update`'s per-frame
+  `speedSet(1)` is skipped in MP — it would flood speed commands).
+- In-session vanilla loads (`BattleStateExiter.exit` → `GameLoader(
+  __beforeBattle).set()`, `reloadBattle` → `__battle`): hook on
+  `GameLoader.set()` sets `Multiplayer.reloading` + `yieldForReload` when
+  called from a command, so every client stops at the same point and
+  `SaveTransfer.finishReloadIfPending` resumes at the same timer (same path
+  as join points). The "CLICK TO CONTINUE" screen is skipped in a session.
+  `SaveTransfer.afterVanillaLoad` re-pauses after a battle restart. The
+  MP clock savable restores speed/accumulator from the loaded file (all
+  clients wrote identical ones at the same tick) and never the timer.
+  `WorldBattleSync.reset` keeps a prompt that was opened inside
+  `doAfterSet` (the post-battle result) across the new-game reset.
+- `Determinism.battleViewActive` now returns "a generated battle is
+  running" (`VIEW.b().state() != null`, set by the command on every client)
+  so the world/settlement resources are skipped during a generated battle
+  exactly as vanilla does, deterministically.
+- Faction name: `StringInputSprite` edits `FACTIONS.player().name` directly;
+  its `Str.add(char)/add(CharSequence)/clear()` are redirected (apply
+  locally, then NAME_SET with the full text when the Str is sim-owned).
+  City division names: `UIDivEditor$3` clear/add → NAME_SET (OWNER_DIV).
+- Not exercised by a run: no world battle happens in the soak save. The
+  headless suite checks every hook and redirect (`testGeneratedBattleHooks`).
+  First human test of engage: watch both logs for "engage: generating",
+  "game load scheduled by a command", "state loaded; game recreated" and
+  equal rndProbe values after the battle exit.
+
 ## Not done / open
 
-1. Human play-test of everything above (battle orders, a world battle, a
-   raid demand with both players clicking).
+1. Human play-test of everything above (battle orders, a world battle
+   including engage → deploy → fight → result → accept, a raid demand with
+   both players clicking).
 2. Human play-test of the second-half items (recruit, mercenaries, create
    army, autonomy, renames, colours, marks, home/workplace assignment,
    oddjobber mover, hospital fetch, move orders, refurnish, room copy, saved

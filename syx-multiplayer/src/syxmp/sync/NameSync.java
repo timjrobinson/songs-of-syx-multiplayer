@@ -36,7 +36,7 @@ import world.map.regions.Region;
  */
 public final class NameSync {
 
-    static final byte OWNER_ARMY = 0, OWNER_REGION = 1, OWNER_ROOM = 2, OWNER_MARK = 3;
+    static final byte OWNER_ARMY = 0, OWNER_REGION = 1, OWNER_ROOM = 2, OWNER_MARK = 3, OWNER_DIV = 4, OWNER_FACTION = 5;
     static final byte COLOR_MARK = 0, COLOR_BANNER = 1, COLOR_DIV_BANNER = 2;
 
     private NameSync() {
@@ -61,6 +61,11 @@ public final class NameSync {
         for (int i = 0; i < SETT.TILE_MAP().marks.all.size(); i++)
             if (SETT.TILE_MAP().marks.all.get(i).name == s)
                 return key(OWNER_MARK, i);
+        if (FACTIONS.player().name == s)
+            return key(OWNER_FACTION, FACTIONS.player().index());
+        for (game.battle.div.Div d : GAME.ARMIES().player().divisions())
+            if (d.info.nameE() == s)
+                return key(OWNER_DIV, d.index());
         for (RoomBlueprintIns<?> b : SETT.ROOMS().ins())
             for (int i = 0; i < b.instancesSize(); i++) {
                 RoomInstance ins = b.getInstance(i);
@@ -90,6 +95,14 @@ public final class NameSync {
             case OWNER_ROOM -> {
                 Room room = SETT.ROOMS().map.getByIndex(index);
                 return room instanceof RoomInstance ins ? ins.name() : null;
+            }
+            case OWNER_FACTION -> {
+                game.faction.Faction f = FACTIONS.getByIndex(index);
+                return f == null ? null : f.name;
+            }
+            case OWNER_DIV -> {
+                game.battle.div.Div d = GAME.ARMIES().division((short) index);
+                return d == null ? null : d.info.nameE();
             }
             default -> {
                 return null;
@@ -122,6 +135,40 @@ public final class NameSync {
             }
         }
         return s.add(text);
+    }
+
+    // --- text typed straight into a sim Str (StringInputSprite.text() returning e.g. the faction name) ----
+
+    private static void sendFullText(Str s) {
+        if (!Multiplayer.shouldSync())
+            return;
+        long owner = ownerOf(s);
+        if (owner < 0)
+            return;
+        ByteWriter w = new ByteWriter(64);
+        w.writeByte(SyncActions.NAME_SET);
+        w.writeByte((int) (owner >> 32));
+        w.writeInt((int) owner);
+        w.writeString(s.toString());
+        ClientCommands.send(CommandType.ACTION, w);
+    }
+
+    public static Str inputAddChar(Str s, char c) {
+        s.add(c);
+        sendFullText(s);
+        return s;
+    }
+
+    public static Str inputAdd(Str s, CharSequence t) {
+        s.add(t);
+        sendFullText(s);
+        return s;
+    }
+
+    public static Str inputClear(Str s) {
+        s.clear();
+        sendFullText(s);
+        return s;
     }
 
     static void executeNameSet(ByteReader r) {

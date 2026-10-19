@@ -55,7 +55,9 @@ public final class SyxAgent {
         });
         SyncTemplates.registerAt(PatchTable.HOOK_LOAD_SCREEN, (self, a) -> {
             syxmp.client.TickController.seedAfterCreate();
-            return false;
+            // No "CLICK TO CONTINUE" inside a session: loads (join points,
+            // battle transitions) complete on every client without a click.
+            return syxmp.client.Multiplayer.active();
         });
         if ("1".equals(System.getProperty("syxmp.enttrace"))) {
             SyncTemplates.registerAt(PatchTable.HOOK_ENT_UPDATE, (self, a) -> {
