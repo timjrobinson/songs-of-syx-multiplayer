@@ -84,6 +84,9 @@ public final class PatchTable {
     public static final int HOOK_IDEPLOY_UPDATE = 39;
     public static final int HOOK_CONCLUDE_UPDATE = 40;
     public static final int HOOK_CONCLUDE_CLOSE = 41;
+    /** Deal proposal message accept / decline buttons (SyncActions.dealAcceptClick/dealDeclineClick). */
+    public static final int HOOK_DEAL_ACCEPT = 42;
+    public static final int HOOK_DEAL_DECLINE = 43;
 
     // Sync-method hooks (bound to SyncMethod handlers by SyxSync) start at 100.
     public static final int HOOK_IMMIGRATION_ADMIT = 100;
@@ -274,6 +277,10 @@ public final class PatchTable {
                 "view/tool/PlacableSimpleTile", "place", "(II)V", "syxmp/sync/ToolSync", "placeSimpleTile"));
         t.redirects.add(new CallRedirect("view/tool/PlacableFixedTool", null,
                 "view/tool/PlacableFixed", "place", "(IIII)V", "syxmp/sync/ToolSync", "placeFixed"));
+        // UIRoomPlacer's single-item area placable (pools, canals) places through the shared item placer
+        // tile by tile (UIRoomPlacer.java:210): the same FIXED command as the fixed tool.
+        t.redirects.add(new CallRedirect("view/sett/ui/room/construction/UIRoomPlacer*", null,
+                "view/tool/PlacableFixed", "place", "(IIII)V", "syxmp/sync/ToolSync", "placeFixed"));
         t.redirects.add(new CallRedirect("view/tool/PlacableSingleTool", null,
                 "view/tool/PlacableSingle", "placeFirst", "(II)V", "syxmp/sync/ToolSync", "placeFirst"));
         t.redirects.add(new CallRedirect("view/tool/PlacableSingleTool", null,
@@ -420,6 +427,16 @@ public final class PatchTable {
                 "(Lsettlement/room/main/Room$RoomInstanceImp;)V", HOOK_REFURNISH));
         t.redirects.add(new CallRedirect(mop + "*", null, "init/resources/RBIT$RBITImp", "or",
                 "(Linit/resources/RBIT;)Linit/resources/RBIT$RBITImp;", "syxmp/sync/UiRedirects", "rbitOr"));
+
+        // The deal proposal message's accept / decline buttons: one command each (SyncActions).
+        t.hooks.add(new EntryHook("view/ui/diplomacy/UIDipMessDeal$3", "clickA", "()V", HOOK_DEAL_ACCEPT));
+        t.hooks.add(new EntryHook("view/ui/diplomacy/UIDipMessDeal$4", "clickA", "()V", HOOK_DEAL_DECLINE));
+
+        // The default tool over another player's room plan (UiRedirects.roomsHover/roomsClick).
+        t.redirects.add(new CallRedirect("view/sett/ToolDefault", null, "view/sett/ui/room/UIRooms", "hover",
+                "(Lutil/gui/misc/GBox;Lsettlement/room/main/Room;II)V", "syxmp/sync/UiRedirects", "roomsHover"));
+        t.redirects.add(new CallRedirect("view/sett/ToolDefault", null, "view/sett/ui/room/UIRooms", "click",
+                "(Lsettlement/room/main/Room;II)V", "syxmp/sync/UiRedirects", "roomsClick"));
 
         // Generated tactical battles (GenBattleSync).
         t.hooks.add(new EntryHook("game/save/GameLoader", "set", "()V", HOOK_GAME_LOADER_SET));

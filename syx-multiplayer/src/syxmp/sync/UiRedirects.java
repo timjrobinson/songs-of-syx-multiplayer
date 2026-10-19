@@ -18,6 +18,31 @@ public final class UiRedirects {
     private UiRedirects() {
     }
 
+    private static final String PLANNING_INSTANCE = "settlement.room.main.placement.Instance";
+
+    /** Another player's room plan: the shared placer's tiles sit in the room map on every client. */
+    private static boolean isPlan(settlement.room.main.Room room) {
+        return room != null && room.getClass().getName().equals(PLANNING_INSTANCE);
+    }
+
+    /** ToolDefault hover/click over a room (ToolDefault.java:212/352): the placer's planning instance has
+     *  no icon or panel (Instance.java:326 returns null; UIRoom.hover throws), and in vanilla only the
+     *  planner sees it, with the placer tool active. Every other client ignores it. */
+    public static void roomsHover(view.sett.ui.room.UIRooms ui, util.gui.misc.GBox box, settlement.room.main.Room room,
+            int rx, int ry) {
+        if (isPlan(room)) {
+            box.title("Planned room");
+            return;
+        }
+        ui.hover(box, room, rx, ry);
+    }
+
+    public static void roomsClick(view.sett.ui.room.UIRooms ui, settlement.room.main.Room room, int tx, int ty) {
+        if (isPlan(room))
+            return;
+        ui.click(room, tx, ty);
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static void intOeSet(INT_OE target, Object key, int v) {
         if (!AutoSync.sendRuntime(target, "set", "(Ljava/lang/Object;I)V", key, v))

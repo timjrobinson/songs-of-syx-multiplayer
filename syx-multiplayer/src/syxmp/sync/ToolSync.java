@@ -45,7 +45,9 @@ public final class ToolSync {
     private static final java.util.Set<String> HOOKED_TOOLS = java.util.Set.of(
             "view.sett.ui.home.UIHomeAssign", "view.sett.ui.room.priority.UIRoomRaceAssign",
             "view.sett.ui.home.UIHomeOdd", "settlement.room.infra.logistics.MoveOrderPullUI$Paster",
-            "settlement.room.infra.logistics.MoveOrderPullUI$Placer", "view.sett.ui.right.UIMiniHotSpots$1");
+            "settlement.room.infra.logistics.MoveOrderPullUI$Placer", "view.sett.ui.right.UIMiniHotSpots$1",
+            // single-item area placable: every tile goes through the shared item placer's FIXED command
+            "view.sett.ui.room.construction.UIRoomPlacer$PlacerItemSingleArea");
     /** placeFirst only sets up local tool state (Copier.java:214: source room, structure, swap, then activates the fixed step). */
     private static final java.util.Set<String> LOCAL_FIRST = java.util.Set.of("settlement.room.main.copy.Copier");
 
@@ -85,6 +87,8 @@ public final class ToolSync {
             w.writeBool(Job.overwrite);
             writeArea(w, area);
             send(w);
+            MpLog.debug("synced tool " + placable.getClass().getName() + " area " + area.body().x1() + ","
+                    + area.body().y1() + " " + area.area());
             return true;
         } catch (RuntimeException e) {
             MpLog.err("tool sync failed; placing locally", e);
@@ -174,9 +178,11 @@ public final class ToolSync {
         w.writeInt(b);
         w.writeInt(c);
         w.writeInt(d);
-        // Fixed placers with UI-local state (room copier, saved prints) carry it along.
+        // Fixed placers carry their UI-local state (rotation/size, item group, copier/print source) along.
         w.writeBytes(kind == FIXED ? RoomToolSync.captureState(placable) : new byte[0]);
         send(w);
+        MpLog.debug("synced tool " + placable.getClass().getName() + " kind " + kind + " at " + a + "," + b
+                + (placable instanceof PlacableFixed f ? " rot " + f.rot() + " size " + f.size() : ""));
         return true;
     }
 
@@ -227,8 +233,17 @@ public final class ToolSync {
             Job.overwrite = data.readBool();
             int a = data.readInt(), b = data.readInt(), c = data.readInt(), d = data.readInt();
             byte[] state = data.readBytes();
-            if (kind == FIXED)
+            if (kind == FIXED) {
                 RoomToolSync.applyState(placable, state);
+                // The tool keeps calling place() while the button is held and the issuer's own call was
+                // cancelled, so the same origin arrives again before the item exists locally; placing
+                // twice throws (MapDataF.java:175). The same check on every client keeps it deterministic.
+                if (c == 0 && d == 0 && ((PlacableFixed) placable).placableWhole(a, b) != null) {
+                    MpLog.debug("skipped fixed placement at " + a + "," + b + ": "
+                            + ((PlacableFixed) placable).placableWhole(a, b));
+                    return;
+                }
+            }
             switch (kind) {
                 case SIMPLE -> ((PlacableSimple) placable).place(a, b);
                 case SIMPLE_TILE -> ((PlacableSimpleTile) placable).place(a, b);

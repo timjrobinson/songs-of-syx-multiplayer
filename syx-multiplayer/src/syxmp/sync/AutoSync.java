@@ -47,10 +47,52 @@ public final class AutoSync {
         MpLog.info("auto-sync hooks: " + AutoSyncTable.METHODS.length);
     }
 
+    private static final String PLACER_INIT =
+            "settlement/room/main/placement/RoomPlacer init (Lsettlement/room/main/RoomBlueprintImp;I)V";
+    private static final String PLACER_CREATE =
+            "settlement/room/main/placement/RoomPlacer create ()Lsnake2d/util/datatypes/COORDINATE;";
+
     private static boolean onCall(int index, Object self, Object[] args) {
         if (!Multiplayer.shouldSync())
             return false;
-        return send(AutoSyncTable.METHODS[index], self, args, paramTypes(index));
+        String key = AutoSyncTable.METHODS[index];
+        if (key.equals(PLACER_INIT) && args[0] != null)
+            return stagePlacer(key, self, args, paramTypes(index));
+        return send(key, self, args, paramTypes(index));
+    }
+
+    /**
+     * RoomPlacer.init(blueprint, upgrade): the construction UI reads the staged blueprint in the same
+     * click (UIRoomPlacer.java:46 opens the tool whose panel calls placer.blueprint().constructor(),
+     * SShape.java:127), and the single-item placable re-stages on every hover (UIRoomPlacer.java:229),
+     * so a deferred-only staging crashed the issuer. The staging runs locally at once (nested setter
+     * hooks suppressed) and again, idempotently, when the command executes on every client; re-staging
+     * the already staged, still empty placer sends nothing.
+     */
+    private static boolean stagePlacer(String key, Object self, Object[] args, Class<?>[] types) {
+        settlement.room.main.placement.RoomPlacer p = (settlement.room.main.placement.RoomPlacer) self;
+        boolean unchanged = p.blueprint() == args[0] && p.size() == 0 && !p.hasHistory()
+                && args[1] instanceof Integer up && up == 0;
+        if (!unchanged && !send(key, self, args, types))
+            return false; // unsyncable: vanilla runs locally as before
+        boolean prev = Multiplayer.dontSync;
+        Multiplayer.dontSync = true;
+        try {
+            Method m = method(key);
+            m.setAccessible(true);
+            m.invoke(self, args);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            MpLog.err("local placer staging failed", e);
+        } finally {
+            Multiplayer.dontSync = prev;
+        }
+        // Indoor rooms build with the placer's wall material, which starts as each client's own
+        // profile default (PLACEMENT.java:62): stage the issuer's on everyone (UtilStructure.set is
+        // a synced verb; the hook skips the local call, the value is already ours).
+        if (!unchanged && args[0] instanceof settlement.room.main.RoomBlueprintImp b
+                && b.constructor() != null && b.constructor().mustBeIndoors())
+            p.structure.set(p.structure.get());
+        return true;
     }
 
     /**
@@ -86,6 +128,14 @@ public final class AutoSync {
 
     private static final String FIELD_PREFIX = "field ";
 
+    /**
+     * Addressable sim objects that are nevertheless UI scratch: the diplomacy draft deal
+     * (DIP.TMP()) is rewritten by the proposal message every frame (UIDipMessDeal.java:202) and
+     * edited in the diplomacy screen; the deal commands carry its content as a DealSave instead.
+     * Writes under these paths run locally only.
+     */
+    private static final String[] LOCAL_TARGETS = {"game.faction.diplomacy.DIP#s.dealTmp"};
+
     private static boolean send(String key, Object self, Object[] args, Class<?>[] types) {
         String target;
         if (self == null) {
@@ -96,6 +146,9 @@ public final class AutoSync {
                 unsyncable(key, "target " + self.getClass().getName());
                 return false;
             }
+            for (String local : LOCAL_TARGETS)
+                if (target.startsWith(local))
+                    return false;
         }
         ByteWriter w = new ByteWriter(128);
         w.writeString(key);
@@ -203,6 +256,14 @@ public final class AutoSync {
                 }
             }
             m.setAccessible(true);
+            if (self instanceof settlement.room.main.placement.RoomPlacer placer)
+                RoomToolSync.refreshPlacer(placer);
+            // The construct button's tool deactivation issues a second create (Config.java:140: in vanilla
+            // the first one had already cleared the placer); with nothing staged it is a no-op everywhere.
+            if (key.equals(PLACER_CREATE) && ((settlement.room.main.placement.RoomPlacer) self).createProblem() != null) {
+                MpLog.debug("skipped create: nothing staged on the placer");
+                return;
+            }
             Object ret = m.invoke(self, args);
             // RoomInstance.remove hands back the shared TmpArea for the caller
             // to release (UIRoom.java:347); the UI's own call was cancelled.

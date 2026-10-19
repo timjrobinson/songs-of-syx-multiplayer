@@ -7,8 +7,10 @@ desync detection. "Syncs and communicates in all the same ways, just syncs
 Songs of Syx data."
 
 **Deep reference docs (read these before touching the sync engine):**
-- `docs/HANDOFF4.md` — **START HERE**: session 4 (battle orders, world
-  battle prompts, raid demand fix) and what is still open
+- `docs/HANDOFF5.md` — **START HERE**: session 5 (first two-PC play-test:
+  furniture, placer, deal-message fixes) and what is still open
+- `docs/HANDOFF4.md` — session 4 (battle orders, world battle prompts, raid
+  demand fix)
 - `docs/HANDOFF3.md` — session 3 results (170 synced verbs,
   determinism fixes, installer, chat commands)
 - `docs/sync-coverage.md` — every UI→sim mutation point, how each is synced,
@@ -324,7 +326,20 @@ Wire protocol (packets/commands) is mirrored in `syxmp.common.Packets` /
   fragmented world transfer + command round-trip against a live server. Run
   `./test.sh` after every change.
 
-## Current status (2026-10-19, session 4)
+## Current status (2026-10-19, session 5)
+
+First human two-PC play-test (0.3.5) desynced on a joiner-side refurnish +
+construct. `docs/HANDOFF5.md`: furniture placement carried no state (item
+group/rotation/size were read from the executing client's own placer),
+placer stats are a UI-refreshed cache, the wall material is a per-player
+profile default, the build menu crashed the issuer (its panel read the
+deferred staging), hovering another player's plan crashed, and the deal
+proposal's accept left the other clients' message open while it flooded the
+stream with draft writes. All fixed; protocol 10. Lesson: a synced verb may
+only read sim state that is identical on every client — anything the
+issuer's UI computes, caches or defaults must travel with the command.
+
+## Status at the end of session 4 (2026-10-19)
 
 Session 4 (`docs/HANDOFF4.md`): tactical battle orders, world battle
 prompts and every remaining "still local" action of `docs/sync-coverage.md`
