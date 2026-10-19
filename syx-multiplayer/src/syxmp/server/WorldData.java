@@ -27,6 +27,8 @@ public final class WorldData {
     public int savedGameTimer;
     /** The session's RND seed (host-chosen); joiners must have it BEFORE loading. */
     public long rngSeed;
+    /** The host's title unlock data (TitleSync.encode), applied by every client after each load. */
+    public String hostTitles = "";
 
     public WorldData(MultiplayerServer server) {
         this.server = server;

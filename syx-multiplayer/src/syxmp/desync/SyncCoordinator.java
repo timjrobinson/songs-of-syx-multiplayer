@@ -121,8 +121,21 @@ public final class SyncCoordinator {
             // no game
         }
         if (!Multiplayer.session.isHost && !"1".equals(System.getProperty("syxmp.noresync"))) {
-            // Rejoin on a later frame, outside the tick that detected it.
-            syxmp.client.MainThread.enqueue(() -> syxmp.client.ClientConnect.resync("desync at " + atTimer));
+            // Rejoin a second later, outside the tick that detected it and after the CLIENT_DESYNCED
+            // packet has left (closing the Steam connection at once dropped it: the host never logged it).
+            resyncAt = System.currentTimeMillis() + 1000;
+            resyncReason = "desync at " + atTimer;
+        }
+    }
+
+    private static long resyncAt;
+    private static String resyncReason;
+
+    /** Once per frame from TickController. */
+    public static void frame() {
+        if (resyncAt != 0 && System.currentTimeMillis() >= resyncAt) {
+            resyncAt = 0;
+            syxmp.client.ClientConnect.resync(resyncReason);
         }
     }
 }

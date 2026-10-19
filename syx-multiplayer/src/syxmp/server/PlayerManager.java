@@ -79,6 +79,8 @@ public final class PlayerManager {
         if (!players.remove(p))
             return;
         MpLog.info("player " + p.username() + " disconnected: " + reason);
+        if (syxmp.dev.RndTrace.ENABLED) // the desync report may not survive the transport's close (Steam)
+            syxmp.dev.RndTrace.dumpRing("player " + p.username() + " disconnected: " + reason);
         server.freezeManager.onPlayerLeft();
         sendPlayerList();
         if (p.isHost())

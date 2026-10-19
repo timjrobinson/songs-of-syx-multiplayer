@@ -86,6 +86,8 @@ public final class SaveTransfer {
         syxmp.ui.MpCursors.clear();
         // Probe: identical on all clients iff RND consumption during the load
         // was identical (unsaved construction-time random state then matches).
+        if (Multiplayer.session != null)
+            syxmp.sync.TitleSync.apply(Multiplayer.session.hostTitles);
         MpLog.info("state loaded; game recreated at timer " + TickController.timer
                 + " rndProbe=" + Integer.toHexString(snake2d.util.rnd.RND.rInt()));
         // Defensive: the first lockstep unit starts from a known state anyway.

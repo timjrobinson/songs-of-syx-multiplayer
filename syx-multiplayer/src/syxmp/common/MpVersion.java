@@ -14,7 +14,7 @@ public final class MpVersion {
      */
     public static final String VERSION = load();
     /** Bump on ANY wire format change. */
-    public static final int PROTOCOL = 10;
+    public static final int PROTOCOL = 13;
 
     private MpVersion() {
     }

@@ -41,6 +41,21 @@ public final class DevAuto {
      *  players are in lockstep, then "constructs" it 100 frames later exactly like SFrame's OK button. */
     private static final String AUTOREFURNISH = System.getProperty("syxmp.autorefurnish");
     private static final String AUTOREFURNISH_ROLE = System.getProperty("syxmp.autorefurnish.role", "joiner");
+    /** -Dsyxmp.hashevery=N: the host requests per-savable state hashes on every client every N timer
+     *  units while a second player is present (diagnostic: the first differing hash point brackets
+     *  the divergence; each hash is an in-memory save, ~0.7 s). */
+    private static final int HASH_EVERY = Integer.getInteger("syxmp.hashevery", 0);
+    private static int nextHashAt;
+    /** -Dsyxmp.autobuild=1: the joiner builds a hunters' lodge from the build-menu path (stage, area,
+     *  items, door undo, construct), then requests state hashes — the second two-PC desync's sequence. */
+    private static final String AUTOBUILD = System.getProperty("syxmp.autobuild");
+    private static int buildFrames, buildStep, bX, bY;
+    /** -Dsyxmp.autocamera=x,y: centre this client's camera on that tile once in lockstep (host or joiner);
+     *  the builder script also centres the joiner on its lodge. Real players look at different places. */
+    private static final String AUTOCAMERA = System.getProperty("syxmp.autocamera");
+    private static int cameraFrames;
+    private static boolean cameraDone;
+    private static final int BW = 8, BH = 8;
     private static int refurnishFrames;
     private static int refurnishStep;
     private static int rfX1, rfY1, rfX2, rfY2;
@@ -180,6 +195,20 @@ public final class DevAuto {
                 // no view yet
             }
         }
+        if (HASH_EVERY > 0 && Multiplayer.active() && Multiplayer.session.isHost && TickController.inLockstep()
+                && Multiplayer.session.players.size() >= 2) {
+            if (nextHashAt == 0)
+                nextHashAt = TickController.timer + HASH_EVERY;
+            if (TickController.timer >= nextHashAt) {
+                nextHashAt = TickController.timer + HASH_EVERY;
+                syxmp.net.ByteWriter w = new syxmp.net.ByteWriter(1);
+                w.writeByte(0);
+                ClientCommands.send(syxmp.common.CommandType.DEBUG_TOOLS, w);
+            }
+        } else {
+            nextHashAt = 0;
+        }
+
         if (AUTOHOST == null && AUTOJOIN == null)
             return;
         gameFrames++;
@@ -191,7 +220,8 @@ public final class DevAuto {
                 hosted = true;
                 MpLog.info("[auto] hosting");
                 HostUtil.hostServer("host", new ServerSettings());
-            } else if (!unpaused && gameFrames > 600 && Multiplayer.active()) {
+            } else if (!unpaused && gameFrames > 600 && Multiplayer.active()
+                    && System.getProperty("syxmp.autohost.nounpause") == null) {
                 unpaused = true;
                 MpLog.info("[auto] unpausing (speed 1)");
                 ClientCommands.requestSpeed(1.0);
@@ -208,13 +238,108 @@ public final class DevAuto {
                 w.writeByte(0);
                 ClientCommands.send(syxmp.common.CommandType.DEBUG_TOOLS, w);
             }
-            if (++framesWithTwo >= 300) {
+            if (++framesWithTwo >= Integer.getInteger("syxmp.autounpause.delay", 300)) {
                 framesWithTwo = 0;
                 MpLog.info("[auto] second player present: speed " + AUTOSPEED);
                 ClientCommands.requestSpeed(AUTOSPEED);
             }
         } else {
             framesWithTwo = 0;
+        }
+
+        if (AUTOCAMERA != null && !cameraDone && Multiplayer.active() && TickController.inLockstep()
+                && TickController.simulatingTarget < 0 && !Multiplayer.reloading && ++cameraFrames >= 30) {
+            cameraDone = true;
+            String[] xy = AUTOCAMERA.split(",");
+            MpLog.info("[auto] camera to " + AUTOCAMERA);
+            view.main.VIEW.s().getWindow().centererTile.set(Integer.parseInt(xy[0]), Integer.parseInt(xy[1]));
+        }
+
+        if (AUTOBUILD != null && buildStep < 6 && Multiplayer.active() && TickController.inLockstep()
+                && TickController.simulatingTarget < 0 && !Multiplayer.reloading
+                && Multiplayer.session.players.size() >= 2 && !Multiplayer.session.isHost) {
+            buildFrames++;
+            settlement.room.main.placement.RoomPlacer placer = settlement.main.SETT.ROOMS().placement.placer;
+            if (buildStep == 0 && buildFrames >= 60) {
+                buildStep = 1;
+                settlement.room.main.RoomBlueprintImp blue = settlement.main.SETT.ROOMS().HUNTERS.get(0);
+                MpLog.info("[auto] build: stage " + blue.key + " from the build menu path");
+                view.main.VIEW.s().ui.placer.init(blue, -1, -1);
+            } else if (buildStep == 1 && buildFrames >= 90) {
+                buildStep = 2;
+                view.tool.PlacableMulti area = (view.tool.PlacableMulti) placer.area();
+                int cx = settlement.main.SETT.TWIDTH / 2, cy = settlement.main.SETT.THEIGHT / 2;
+                boolean placed = false;
+                for (int r = 6; r < cx - 10 && !placed; r += 3) {
+                    for (int k = 0; k < 6 && !placed; k++) {
+                        int x = cx - r + k * 2, y = cy + r / 2;
+                        boolean ok = true;
+                        for (int dy = 0; dy < BH && ok; dy++)
+                            for (int dx = 0; dx < BW && ok; dx++)
+                                ok = area.isPlacable(x + dx, y + dy, syxmp.sync.ToolSync.rect(x, y, BW, BH),
+                                        view.tool.PLACER_TYPE.SQUARE) == null;
+                        if (ok) {
+                            bX = x; bY = y;
+                            MpLog.info("[auto] build: area " + BW + "x" + BH + " at " + x + "," + y + " (camera there)");
+                            view.main.VIEW.s().getWindow().centererTile.set(x + BW / 2, y + BH / 2);
+                            syxmp.sync.ToolSync.devPlaceMulti(area, x, y, BW, BH);
+                            placed = true;
+                        }
+                    }
+                }
+                if (!placed) {
+                    MpLog.info("[auto] build: no spot");
+                    buildStep = 6;
+                }
+            } else if (buildStep == 2 && buildFrames >= 150) {
+                buildStep = 3;
+                int groups = placer.blueprint().constructor().pgroups().size();
+                int fromX = bX;
+                for (int g = 0; g < groups && g < 3; g++) {
+                    view.tool.PlacableFixed pp = placer.item(g);
+                    boolean placed = false;
+                    for (int y = bY; y < bY + BH && !placed; y++)
+                        for (int x = fromX; x < bX + BW && !placed; x++)
+                            if (pp.placableWhole(x, y) == null) {
+                                MpLog.info("[auto] build: item group " + g + " " + pp.width() + "x" + pp.height()
+                                        + " at " + x + "," + y);
+                                // like the tool: one place() per footprint tile, several frames
+                                for (int ry = 0; ry < pp.height(); ry++)
+                                    for (int rx = 0; rx < pp.width(); rx++)
+                                        syxmp.sync.ToolSync.placeFixed(pp, x + rx, y + ry, rx, ry);
+                                syxmp.sync.ToolSync.placeFixed(pp, x, y, 0, 0);
+                                fromX = x + pp.width() + 1;
+                                placed = true;
+                            }
+                    if (!placed)
+                        MpLog.info("[auto] build: no spot for item group " + g);
+                }
+            } else if (buildStep == 3 && buildFrames >= 210) {
+                buildStep = 4;
+                // PlacerDoor$2 in the play-test log is the door placer (PlacerDoor.java:76; $1 is its undo)
+                view.tool.PlacableMulti door = (view.tool.PlacableMulti) placer.placerDoor;
+                // one door per edge (the first spot's outside may be blocked)
+                int[][] edges = {{bX + BW / 2, bY - 1}, {bX + BW / 2, bY + BH}, {bX - 1, bY + BH / 2}, {bX + BW, bY + BH / 2}};
+                for (int[] e : edges) {
+                    if (door.isPlacable(e[0], e[1], null, null) == null) {
+                        MpLog.info("[auto] build: door at " + e[0] + "," + e[1]);
+                        syxmp.sync.ToolSync.devPlaceMulti(door, e[0], e[1], 1, 1);
+                    } else
+                        MpLog.info("[auto] build: no door at " + e[0] + "," + e[1] + ": " + door.isPlacable(e[0], e[1], null, null));
+                }
+            } else if (buildStep == 4 && buildFrames >= 270) {
+                buildStep = 5;
+                MpLog.info("[auto] build: construct; problem=" + placer.createProblem() + " size " + placer.size()
+                        + " autoWalls " + placer.autoWalls.is() + " structure " + placer.structure.get());
+                placer.create();
+                view.main.VIEW.s().tools.placer.deactivate();
+            } else if (buildStep == 5 && buildFrames >= 330) {
+                buildStep = 6;
+                MpLog.info("[auto] build: requesting state hashes");
+                syxmp.net.ByteWriter w = new syxmp.net.ByteWriter(1);
+                w.writeByte(0);
+                ClientCommands.send(syxmp.common.CommandType.DEBUG_TOOLS, w);
+            }
         }
 
         if (AUTOREFURNISH != null && refurnishStep < 3 && Multiplayer.active() && TickController.inLockstep()

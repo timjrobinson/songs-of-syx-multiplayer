@@ -21,6 +21,25 @@ public final class Determinism {
      * polling) — frame-rate dependent. In multiplayer it runs once per Timer
      * unit from TickController instead.
      */
+    private static int uncached;
+
+    /**
+     * Replaces GAME.updateI() inside the lazily refreshed class-level boosters (RoomUpgrades,
+     * RoomIrrigated, ROOM_WATER: "if (|updateI - ci| >= 120) recompute", ROOM_POLICE per tick,
+     * StatsMultipliers.maxAmount). They refresh on whichever access comes first, a UI panel or the
+     * simulation, so each client's cached value had a different age and industry job times
+     * (IndustryUtil.calcProductionRate: bonus.get(HCLASS_RACE.clP())) differed for up to 120 ticks
+     * after any staffing change — the two-PC desync after building a room. In MP the counter
+     * returned here moves by 256 on every call, so the staleness test is always true and the value
+     * is a pure function of the shared state (the loops are over one blueprint's rooms).
+     */
+    public static int uncachedUpdateI() {
+        if (!Multiplayer.active())
+            return GAME.updateI();
+        uncached = (uncached + 256) & 0x3FFFFFFF;
+        return uncached;
+    }
+
     public static void afterTick(GAME game) {
         if (Multiplayer.active() && (Multiplayer.reloading || TickController.inLockstep()))
             return;

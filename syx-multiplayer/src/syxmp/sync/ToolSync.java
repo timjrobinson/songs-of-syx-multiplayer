@@ -85,6 +85,7 @@ public final class ToolSync {
             w.writeString(path);
             w.writeByte(typeIndex(type));
             w.writeBool(Job.overwrite);
+            w.writeBool(SETT.JOBS().planMode.is());
             writeArea(w, area);
             send(w);
             MpLog.debug("synced tool " + placable.getClass().getName() + " area " + area.body().x1() + ","
@@ -117,6 +118,7 @@ public final class ToolSync {
                 wr.writeString(path);
                 wr.writeByte(typeIndex(type));
                 wr.writeBool(Job.overwrite);
+                wr.writeBool(SETT.JOBS().planMode.is());
                 writeArea(wr, area);
                 send(wr);
                 return;
@@ -174,6 +176,7 @@ public final class ToolSync {
         w.writeByte(kind);
         w.writeString(path);
         w.writeBool(Job.overwrite);
+        w.writeBool(SETT.JOBS().planMode.is());
         w.writeInt(a);
         w.writeInt(b);
         w.writeInt(c);
@@ -211,10 +214,15 @@ public final class ToolSync {
             return;
         }
         boolean over = Job.overwrite;
+        // Plan mode is a per-client toggle (Options.java:82) that a new construction reads for its
+        // active flag (ConstructionInstance.java:145) and Placer.place for the job state: the
+        // issuer's value, like the overwrite toggle.
+        boolean plan = SETT.JOBS().planMode.is();
         try {
             if (kind == MULTI) {
                 PLACER_TYPE type = PLACER_TYPE.all.get(data.readByte());
                 Job.overwrite = data.readBool();
+                SETT.JOBS().planMode.set(data.readBool());
                 SyncArea area = readArea(data);
                 PlacableMulti p = (PlacableMulti) placable;
                 p.finishChecking(area);
@@ -231,6 +239,7 @@ public final class ToolSync {
                 return;
             }
             Job.overwrite = data.readBool();
+            SETT.JOBS().planMode.set(data.readBool());
             int a = data.readInt(), b = data.readInt(), c = data.readInt(), d = data.readInt();
             byte[] state = data.readBytes();
             if (kind == FIXED) {
@@ -254,6 +263,7 @@ public final class ToolSync {
             }
         } finally {
             Job.overwrite = over;
+            SETT.JOBS().planMode.set(plan);
         }
     }
 
