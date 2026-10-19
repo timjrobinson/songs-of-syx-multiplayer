@@ -51,6 +51,11 @@ public final class MpMenuScreen {
     private final GInput maxPlayersInput;
     private boolean pauseOnJoin = true;
     private final GuiSection friends = new GuiSection();
+    /** Where the layout put the friends section. GuiSection.clear() resets
+     *  the section's bounds to the screen origin (GuiSection.java:65-74), so
+     *  every refresh must move it back before adding rows, or the rows are
+     *  drawn in the top-left corner of the screen. */
+    private int friendsX, friendsY;
     private final GText status = new GText(UI.FONT().M, 160);
     private final GText hint = new GText(UI.FONT().M, 200);
     private boolean showingHost;
@@ -165,6 +170,8 @@ public final class MpMenuScreen {
         form.addDown(8, friends);
 
         form.body().moveX1Y1(MenuScreen.inner.x1() + 20, MenuScreen.inner.y1() + 20);
+        friendsX = friends.body().x1();
+        friendsY = friends.body().y1();
         main.add(form);
         main.add(frame);
         main.moveLastToBack();
@@ -272,20 +279,20 @@ public final class MpMenuScreen {
             return;
         lastFriendsRefresh = now;
         friends.clear();
+        friends.body().moveX1Y1(friendsX, friendsY);
         if (!SteamMp.enabled()) {
-            friends.add(new GText(UI.FONT().M, "steam integration is off (steam=0 in settings/SyxMultiplayer.txt)"), 0, 0);
+            friendsRow(new GText(UI.FONT().M, "steam integration is off (steam=0 in settings/SyxMultiplayer.txt)"));
             return;
         }
         if (!SteamMp.available()) {
-            friends.add(new GText(UI.FONT().M, "steam is not running, or the game was not started through steam"), 0, 0);
+            friendsRow(new GText(UI.FONT().M, "steam is not running, or the game was not started through steam"));
             return;
         }
         java.util.List<SteamMp.FriendLobby> lobbies = SteamMp.friendLobbies();
         if (lobbies.isEmpty()) {
-            friends.add(new GText(UI.FONT().M, "no friends are hosting right now"), 0, 0);
+            friendsRow(new GText(UI.FONT().M, "no friends are hosting right now"));
             return;
         }
-        boolean first = true;
         for (SteamMp.FriendLobby fl : lobbies) {
             CLICKABLE b = new MenuScreen.ScreenButton(fl.friendName + "  -  " + fl.gameName, UI.FONT().H2) {
                 @Override
@@ -299,13 +306,18 @@ public final class MpMenuScreen {
                     SteamMp.joinLobby(fl.lobbyId, username());
                 }
             };
-            if (first) {
-                friends.add(b, 0, 0);
-                first = false;
-            } else {
-                friends.addDown(4, b);
-            }
+            friendsRow(b);
         }
+    }
+
+    /** Adds a row below the previous one, starting at the section's own
+     *  top-left (after clear() "previous" is the empty bounds rectangle). */
+    private void friendsRow(snake2d.util.gui.renderable.RENDEROBJ r) {
+        friends.addDown(friends.elements().size() == 0 ? 0 : 4, r);
+    }
+
+    private void friendsRow(snake2d.util.sprite.SPRITE s) {
+        friends.addDown(friends.elements().size() == 0 ? 0 : 4, s);
     }
 
     // --- SC-like surface used by the bridge --------------------------------
