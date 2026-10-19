@@ -273,7 +273,7 @@ public final class MpMenuScreen {
         lastFriendsRefresh = now;
         friends.clear();
         if (!SteamMp.enabled()) {
-            friends.add(new GText(UI.FONT().M, "steam integration is off (experimental): set steam=1 in settings/SyxMultiplayer.txt to try it"), 0, 0);
+            friends.add(new GText(UI.FONT().M, "steam integration is off (steam=0 in settings/SyxMultiplayer.txt)"), 0, 0);
             return;
         }
         if (!SteamMp.available()) {

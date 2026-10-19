@@ -83,7 +83,7 @@ final class SteamMpImpl {
 
     private static SteamMpImpl tryInit() {
         try {
-            SteamAPI.loadLibraries();
+            SteamNatives.load();
             if (!SteamAPI.init()) {
                 MpLog.info("steam: not available (not started through Steam, or Steam not running)");
                 return null;
@@ -91,7 +91,7 @@ final class SteamMpImpl {
             SteamMpImpl impl = new SteamMpImpl();
             MpLog.info("steam: initialized as " + impl.friends.getPersonaName() + " (app " + impl.appId + ")");
             return impl;
-        } catch (SteamException | UnsatisfiedLinkError | RuntimeException e) {
+        } catch (SteamException | java.io.IOException | UnsatisfiedLinkError | RuntimeException e) {
             MpLog.info("steam: unavailable: " + e);
             return null;
         }

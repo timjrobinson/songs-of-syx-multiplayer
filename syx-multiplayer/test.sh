@@ -17,6 +17,8 @@ mkdir -p "$TEST_CLASSES"
     -d "$TEST_CLASSES" \
     "$ROOT"/test/*.java
 
-"$SYX_JDK/bin/java" \
+# SteamAppId lets SteamAPI.init() connect when a Steam client is running (the
+# Steam natives test then also exercises the callback pump); harmless otherwise.
+SteamAppId=1162750 "$SYX_JDK/bin/java" \
     -cp "$TEST_CLASSES:$CLASSES:$SYX_GAME_JAR" \
     HeadlessTest

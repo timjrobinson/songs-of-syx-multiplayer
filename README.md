@@ -14,6 +14,11 @@ UI offers is synced (see `docs/sync-coverage.md`). Expect occasional desyncs;
 the mod detects them and the drifted player rejoins automatically. Reports
 are very welcome: see [Reporting problems](#reporting-problems).
 
+- Steam: when the game is started through Steam, hosting opens a
+  friends-only lobby, friends see "Join Game" and a "friends hosting" list in
+  the multiplayer menu, and the connection goes through Steam's relay (no
+  port forwarding). Direct IP joins work without Steam. Turn it off with
+  `steam=0` in `<data>/settings/SyxMultiplayer.txt`.
 - Game version required: **Songs of Syx V71.44** (every player)
 - Mod version required: **the same release for every player** (the join is refused otherwise)
 - Platforms: Windows, Linux (native, Steam snap/Flatpak, Proton), macOS

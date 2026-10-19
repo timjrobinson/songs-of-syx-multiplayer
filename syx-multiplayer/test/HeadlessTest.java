@@ -45,6 +45,7 @@ public final class HeadlessTest {
         testGeneratedBattleHooks();
         testBattleOrderCodec();
         testNameSyncWithoutGame();
+        testSteamNativesSurviveSharedRewrite();
         testJoinFlowOverTcp();
         System.out.println(failures == 0 ? "ALL TESTS PASSED" : failures + " FAILURES");
         System.exit(failures == 0 ? 0 : 1);
@@ -441,6 +442,49 @@ public final class HeadlessTest {
             check((c.red() & 0xFF) == 200, "colour edited locally without a game");
         } finally {
             Multiplayer.session = null;
+        }
+    }
+
+    /** The Steam natives are loaded from a private directory, so another JVM running steamworks4j's shared loader
+     *  (the game's SteamAchieve helper does, at startup and on every main-menu visit) cannot rewrite them under us.
+     *  Reproduces the "SIGSEGV in SteamAPI.runCallbacks()V+0 at pc=0x210a6" crash of HANDOFF2 §5: with the shared
+     *  loader this process dies while the child extracts. Needs a running Steam client and SteamAppId in the
+     *  environment (test.sh sets it) for the callback part; the load itself is checked everywhere. */
+    static void testSteamNativesSurviveSharedRewrite() throws Exception {
+        System.out.println("testSteamNativesSurviveSharedRewrite");
+        java.nio.file.Path shared = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"), "steamworks4j", "1.9.0");
+        long sharedBefore = java.nio.file.Files.exists(shared) ? java.nio.file.Files.getLastModifiedTime(shared).toMillis() : -1;
+        syxmp.steam.SteamNatives.load();
+        check(syxmp.steam.SteamNatives.isLoaded(), "natives loaded from a private directory");
+        long sharedAfter = java.nio.file.Files.exists(shared) ? java.nio.file.Files.getLastModifiedTime(shared).toMillis() : -1;
+        check(sharedBefore == sharedAfter, "the shared steamworks4j extraction path was not touched");
+        boolean running;
+        try {
+            running = com.codedisaster.steamworks.SteamAPI.init();
+        } catch (com.codedisaster.steamworks.SteamException e) {
+            running = false;
+        }
+        if (!running) {
+            System.out.println("  (steam not running or no SteamAppId: callback race check skipped)");
+            return;
+        }
+        try {
+            String javaBin = java.nio.file.Paths.get(System.getProperty("java.home"), "bin", "java").toString();
+            Process child = new ProcessBuilder(javaBin, "-cp", System.getProperty("java.class.path"), "SteamRewriteChild")
+                    .redirectErrorStream(true).start();
+            long end = System.currentTimeMillis() + 4000;
+            int pumps = 0;
+            while (System.currentTimeMillis() < end) {
+                com.codedisaster.steamworks.SteamAPI.runCallbacks();
+                pumps++;
+                Thread.sleep(20);
+            }
+            String out = new String(child.getInputStream().readAllBytes());
+            int code = child.waitFor();
+            check(out.contains("rewrote"), "child re-extracted the shared natives (exit " + code + ")");
+            check(pumps > 50, "callbacks pumped through the rewrite (" + pumps + ")");
+        } finally {
+            com.codedisaster.steamworks.SteamAPI.shutdown();
         }
     }
 

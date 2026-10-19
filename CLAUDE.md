@@ -354,8 +354,9 @@ Warn/Error are deterministic in MP. The intermittent real-play desync was
 gore on the cosmetic RND stream (fixed); a 27-minute pair soak at speed 5
 with 205 scripted synced actions then ran clean (paused-step experiment
 desynced and is off; see HANDOFF3). Not yet play-tested by humans with the
-new table. Steam is opt-in
-and untested. Distributable: `syx-multiplayer/package.sh` → `dist/*.zip`;
+new table. Steam was opt-in
+until session 5 (now on by default; the "snap crash" was steamworks4j's
+shared native-library path, see `steam/SteamNatives`). Distributable: `syx-multiplayer/package.sh` → `dist/*.zip`;
 version 0.3.0, protocol 6.
 
 ## Determinism rules (every change must respect these)
