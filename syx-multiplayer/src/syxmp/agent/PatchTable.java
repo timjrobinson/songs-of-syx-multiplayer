@@ -428,6 +428,11 @@ public final class PatchTable {
         t.redirects.add(new CallRedirect(mop + "*", null, "init/resources/RBIT$RBITImp", "or",
                 "(Linit/resources/RBIT;)Linit/resources/RBIT$RBITImp;", "syxmp/sync/UiRedirects", "rbitOr"));
 
+        // Item placer hover rendering toggles auto-walls off and on around the preview: local only.
+        t.redirects.add(new CallRedirect("settlement/room/main/placement/PlacerItemArea", "renderPlaceHolder",
+                "settlement/room/main/placement/RoomPlacer$AutoWalls", "set", "(Z)Lutil/data/BOOLEAN$BOOLEAN_MUTABLE;",
+                "syxmp/sync/UiRedirects", "autoWallsLocal"));
+
         // The deal proposal message's accept / decline buttons: one command each (SyncActions).
         t.hooks.add(new EntryHook("view/ui/diplomacy/UIDipMessDeal$3", "clickA", "()V", HOOK_DEAL_ACCEPT));
         t.hooks.add(new EntryHook("view/ui/diplomacy/UIDipMessDeal$4", "clickA", "()V", HOOK_DEAL_DECLINE));

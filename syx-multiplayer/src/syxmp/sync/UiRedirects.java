@@ -43,6 +43,20 @@ public final class UiRedirects {
         ui.click(room, tx, ty);
     }
 
+    /** PlacerItemArea.renderPlaceHolder brackets its rendering with autoWalls.set(false)/set(b)
+     *  (PlacerItemArea.java:132-134): render scratch, two synced commands per hovered frame otherwise,
+     *  and an odd count left the other clients with auto-walls off at construction. Local only. */
+    public static util.data.BOOLEAN.BOOLEAN_MUTABLE autoWallsLocal(
+            settlement.room.main.placement.RoomPlacer.AutoWalls walls, boolean b) {
+        boolean prev = syxmp.client.Multiplayer.dontSync;
+        syxmp.client.Multiplayer.dontSync = true;
+        try {
+            return walls.set(b);
+        } finally {
+            syxmp.client.Multiplayer.dontSync = prev;
+        }
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static void intOeSet(INT_OE target, Object key, int v) {
         if (!AutoSync.sendRuntime(target, "set", "(Ljava/lang/Object;I)V", key, v))
