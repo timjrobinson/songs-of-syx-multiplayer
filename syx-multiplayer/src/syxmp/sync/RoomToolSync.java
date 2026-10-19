@@ -465,6 +465,35 @@ public final class RoomToolSync {
         }
     }
 
+    private static java.lang.reflect.Field[] placerTicks;
+
+    /**
+     * Once per rendered frame in MP: the placer's caches (item stats, extra cost, door walls, roofs)
+     * are keyed on GAME.updateI(), which vanilla advances every frame even while paused (GAME.java:
+     * 241, update(0)) but MP never advances while paused. Without this the construction panel shows
+     * the stats as they were when the room was staged — zero — and the construct button refuses.
+     */
+    public static void invalidatePlacerCaches() {
+        try {
+            if (!Multiplayer.gameExists() || SETT.ROOMS() == null)
+                return;
+            settlement.room.main.placement.RoomPlacer placer = SETT.ROOMS().placement.placer;
+            if (placerTicks == null) {
+                Object[] owners = {field(placer, "resources"), field(placer, "cost"), placer.door, placer.structure};
+                placerTicks = new java.lang.reflect.Field[owners.length];
+                for (int i = 0; i < owners.length; i++)
+                    placerTicks[i] = ReflectUtil.field(owners[i].getClass(), "tick");
+            }
+            placerTicks[0].setInt(field(placer, "resources"), -1);
+            placerTicks[1].setInt(field(placer, "cost"), -1);
+            placerTicks[2].setInt(placer.door, -1);
+            placerTicks[3].setInt(placer.structure, -1);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            placerTicks = null;
+            MpLog.err("cannot invalidate placer caches", e);
+        }
+    }
+
     // --- copier / saved print state (carried by the TOOL command) ---------------------
 
     private static final String COPIER = "settlement.room.main.copy.Copier$7";
