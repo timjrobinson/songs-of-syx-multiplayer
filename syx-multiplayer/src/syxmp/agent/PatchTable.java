@@ -87,6 +87,12 @@ public final class PatchTable {
     /** Deal proposal message accept / decline buttons (SyncActions.dealAcceptClick/dealDeclineClick). */
     public static final int HOOK_DEAL_ACCEPT = 42;
     public static final int HOOK_DEAL_DECLINE = 43;
+    /** Dev: work sub-activity tracing (with -Dsyxmp.enttrace=1): job class, duration, cycle counter. */
+    public static final int HOOK_WORK_ACTIVATE = 44;
+    public static final int HOOK_WORK_RESUME = 45;
+    public static final int HOOK_FETCH_CHECK = 46;
+    public static final int HOOK_DEPOSIT_BITS = 47;
+    public static final int HOOK_PROD_RATE = 48;
 
     // Sync-method hooks (bound to SyncMethod handlers by SyxSync) start at 100.
     public static final int HOOK_IMMIGRATION_ADMIT = 100;
@@ -138,6 +144,13 @@ public final class PatchTable {
                 "syxmp/client/TickController", "gameUpdate"));
 
         // Determinism catalogue ------------------------------------------
+        // Lazily refreshed class-level boosters recompute on every call in MP
+        // (Determinism.uncachedUpdateI): their refresh moment was per client.
+        for (String c : new String[] {"settlement/room/main/RoomUpgrades*", "settlement/room/water/RoomIrrigated*",
+                "settlement/room/water/ROOM_WATER*", "settlement/room/law/police/ROOM_POLICE*",
+                "settlement/stats/muls/StatsMultipliers*"})
+            t.redirects.add(new CallRedirect(c, null, "game/GAME", "updateI", "()I",
+                    "syxmp/client/Determinism", "uncachedUpdateI"));
         // Per-frame game.afterTick() (VIEW.java:193) runs from the lockstep
         // loop in MP instead of once per rendered frame.
         t.redirects.add(new CallRedirect(
@@ -227,6 +240,24 @@ public final class PatchTable {
                         "syxmp/client/DetRnd", "*"));
 
         if ("1".equals(System.getProperty("syxmp.enttrace"))) {
+            String hd = "Lsettlement/entity/humanoid/Humanoid;Lsettlement/entity/humanoid/ai/main/AIManager;";
+            for (String sw : new String[] {"SubWorkHands", "SubWorkTool", "SubWorkThink"}) {
+                t.hooks.add(new EntryHook("settlement/entity/humanoid/ai/work/SubWork$" + sw, "activate",
+                        "(" + hd + "Lsettlement/misc/job/SETT_JOB;)Lsettlement/entity/humanoid/ai/main/AISUB$AISubActivation;",
+                        HOOK_WORK_ACTIVATE));
+                t.hooks.add(new EntryHook("settlement/entity/humanoid/ai/work/SubWork$" + sw, "resume",
+                        "(" + hd + ")Lsettlement/entity/humanoid/ai/main/AISTATE;", HOOK_WORK_RESUME));
+            }
+            t.hooks.add(new EntryHook("settlement/room/industry/module/consumption/RoomConsumption", "shouldFecth",
+                    "(Lsettlement/room/industry/module/IndustryResource;Lsettlement/room/industry/module/ROOM_IDATA_INSTANCE;Lsettlement/room/main/RoomInstance;)Z",
+                    HOOK_FETCH_CHECK));
+            t.hooks.add(new EntryHook("settlement/room/main/job/RoomResDeposit", "jobResourceBitToFetch",
+                    "()Linit/resources/RBIT;", HOOK_DEPOSIT_BITS));
+            t.hooks.add(new EntryHook("settlement/room/main/job/RoomResDeposit", "jobReserve",
+                    "(Linit/resources/RESOURCE;)V", HOOK_DEPOSIT_BITS));
+            t.hooks.add(new EntryHook("settlement/room/industry/module/IndustryUtil", "calcProductionRate",
+                    "(DLsettlement/entity/humanoid/Humanoid;Lsettlement/room/industry/module/IndustryRate;Lgame/boosting/Boostable;Lsettlement/room/main/RoomInstance;)D",
+                    HOOK_PROD_RATE));
             t.hooks.add(new EntryHook("settlement/entity/humanoid/Humanoid", "update", "(D)Z", HOOK_ENT_UPDATE));
             t.hooks.add(new EntryHook("settlement/entity/animal/Animal", "update", "(D)Z", HOOK_ENT_UPDATE));
             t.redirects.add(new CallRedirect("settlement/path/path/SPath", null,
@@ -432,6 +463,11 @@ public final class PatchTable {
         t.redirects.add(new CallRedirect("settlement/room/main/placement/PlacerItemArea", "renderPlaceHolder",
                 "settlement/room/main/placement/RoomPlacer$AutoWalls", "set", "(Z)Lutil/data/BOOLEAN$BOOLEAN_MUTABLE;",
                 "syxmp/sync/UiRedirects", "autoWallsLocal"));
+
+        // Auto employment on/off per room (ModuleEmployment): the blueprint's per-instance flag, read by the sim.
+        t.redirects.add(new CallRedirect("view/sett/ui/room/ModuleEmployment*", null,
+                "settlement/room/main/job/ROOM_EMPLOY_AUTO", "autoEmploy", "(Lsettlement/room/main/Room;Z)V",
+                "syxmp/sync/UiRedirects", "autoEmploy"));
 
         // The deal proposal message's accept / decline buttons: one command each (SyncActions).
         t.hooks.add(new EntryHook("view/ui/diplomacy/UIDipMessDeal$3", "clickA", "()V", HOOK_DEAL_ACCEPT));

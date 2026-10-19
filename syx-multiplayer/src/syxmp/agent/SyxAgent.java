@@ -64,6 +64,26 @@ public final class SyxAgent {
                 syxmp.dev.EntTrace.onUpdate(self, a);
                 return false;
             });
+            SyncTemplates.registerAt(PatchTable.HOOK_WORK_ACTIVATE, (self, a) -> {
+                syxmp.dev.EntTrace.onWorkActivate(self, a);
+                return false;
+            });
+            SyncTemplates.registerAt(PatchTable.HOOK_PROD_RATE, (self, a) -> {
+                syxmp.dev.EntTrace.onProdRate(a);
+                return false;
+            });
+            SyncTemplates.registerAt(PatchTable.HOOK_DEPOSIT_BITS, (self, a) -> {
+                syxmp.dev.EntTrace.onDeposit(self, a);
+                return false;
+            });
+            SyncTemplates.registerAt(PatchTable.HOOK_FETCH_CHECK, (self, a) -> {
+                syxmp.dev.EntTrace.onFetchCheck(self, a);
+                return false;
+            });
+            SyncTemplates.registerAt(PatchTable.HOOK_WORK_RESUME, (self, a) -> {
+                syxmp.dev.EntTrace.onWorkResume(self, a);
+                return false;
+            });
             SyncTemplates.registerAt(PatchTable.HOOK_SPATH_FIND, (self, a) -> {
                 syxmp.dev.RndTrace.mark("S " + a[0] + "," + a[1] + "->" + a[2] + "," + a[3] + (Boolean.TRUE.equals(a[4]) ? " full" : ""));
                 return false;

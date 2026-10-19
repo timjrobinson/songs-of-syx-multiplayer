@@ -181,9 +181,16 @@ public final class RndTrace {
     }
 
     /** Write the rolling window to <logs>/syxmp-rnd-desync.txt (both clients call this on a desync). */
+    private static long lastDump;
+
     public static synchronized void dumpRing(String why) {
         if (!ENABLED)
             return;
+        // Keep the first dump of an incident: the host's later dump at the player's disconnect
+        // would overwrite the one taken when the desync was reported, whose ring still covers it.
+        if (System.currentTimeMillis() - lastDump < 60_000)
+            return;
+        lastDump = System.currentTimeMillis();
         try {
             Path dir = Path.of(System.getProperty("user.home"), ".local", "share", "songsofsyx", "logs");
             Files.createDirectories(dir);

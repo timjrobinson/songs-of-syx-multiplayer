@@ -60,6 +60,7 @@ public final class MultiplayerServer {
         worldData.savedGame = savedGame;
         worldData.savedGameTimer = timer;
         worldData.rngSeed = rngSeed;
+        worldData.hostTitles = syxmp.sync.TitleSync.encode(); // "" in the headless test (no game)
     }
 
     /** Transports register per-net-tick work (accept polling etc.) here. */

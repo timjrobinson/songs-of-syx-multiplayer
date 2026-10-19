@@ -174,6 +174,9 @@ public final class AgentInstaller {
                 // Stale path from an old install — drop that entry
                 content = content.replaceAll("[ \\t]*\"-javaagent:[^\"]*\",?[ \\t]*\\r?\\n?", "");
             }
+            // Leftover diagnostic flags from a traced session (desync hunting) slow the game down:
+            // they are never part of a player install.
+            content = content.replaceAll("[ \\t]*\"-Dsyxmp\\.(rndtrace|enttrace|hashevery)[^\"]*\",?[ \\t]*\\r?\\n?", "");
             int idx = content.indexOf("JVM_ARGS2:");
             if (idx < 0) {
                 // No JVM_ARGS2 block at all: append one (the parser accepts any key order).

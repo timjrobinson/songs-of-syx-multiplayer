@@ -167,6 +167,10 @@ public final class AutoSync {
                 return false;
             }
         }
+        // The issuer's overwrite tool toggle: job placement consults it (Placer.java:56 ->
+        // Job.problem(tx, ty, Job.overwrite)); every client executes with the issuer's value.
+        w.writeBool(settlement.job.Job.overwrite);
+        w.writeBool(settlement.main.SETT.JOBS().planMode.is()); // per-client too (ConstructionInstance.java:145)
         ByteWriter packet = new ByteWriter(w.size() + 4);
         packet.writeByte(CommandType.SYNC_AUTO.ordinal());
         packet.writeBytes(w.toArray());
@@ -247,6 +251,8 @@ public final class AutoSync {
             Object[] args = new Object[types.length];
             for (int i = 0; i < types.length; i++)
                 args[i] = readArg(data, types[i]);
+            boolean overwrite = data.readBool();
+            boolean plan = data.readBool();
             Object self = null;
             if (!target.equals(STATIC_TARGET)) {
                 self = ObjectPaths.resolve(target);
@@ -256,22 +262,35 @@ public final class AutoSync {
                 }
             }
             m.setAccessible(true);
-            if (self instanceof settlement.room.main.placement.RoomPlacer placer)
-                RoomToolSync.refreshPlacer(placer);
-            // The construct button's tool deactivation issues a second create (Config.java:140: in vanilla
-            // the first one had already cleared the placer); with nothing staged it is a no-op everywhere.
-            if (key.equals(PLACER_CREATE) && ((settlement.room.main.placement.RoomPlacer) self).createProblem() != null) {
-                MpLog.debug("skipped create: nothing staged on the placer");
-                return;
+            boolean prevOverwrite = settlement.job.Job.overwrite;
+            boolean prevPlan = settlement.main.SETT.JOBS().planMode.is();
+            settlement.job.Job.overwrite = overwrite;
+            settlement.main.SETT.JOBS().planMode.set(plan);
+            try {
+                invoke(key, m, self, args);
+            } finally {
+                settlement.job.Job.overwrite = prevOverwrite;
+                settlement.main.SETT.JOBS().planMode.set(prevPlan);
             }
-            Object ret = m.invoke(self, args);
-            // RoomInstance.remove hands back the shared TmpArea for the caller
-            // to release (UIRoom.java:347); the UI's own call was cancelled.
-            if (ret instanceof settlement.room.main.TmpArea area)
-                area.clear();
         } catch (ReflectiveOperationException | RuntimeException e) {
             MpLog.err("auto-sync execution failed for " + key + " on " + target, e);
         }
+    }
+
+    private static void invoke(String key, Method m, Object self, Object[] args) throws ReflectiveOperationException {
+        if (self instanceof settlement.room.main.placement.RoomPlacer placer)
+            RoomToolSync.refreshPlacer(placer);
+        // The construct button's tool deactivation issues a second create (Config.java:140: in vanilla
+        // the first one had already cleared the placer); with nothing staged it is a no-op everywhere.
+        if (key.equals(PLACER_CREATE) && ((settlement.room.main.placement.RoomPlacer) self).createProblem() != null) {
+            MpLog.debug("skipped create: nothing staged on the placer");
+            return;
+        }
+        Object ret = m.invoke(self, args);
+        // RoomInstance.remove hands back the shared TmpArea for the caller
+        // to release (UIRoom.java:347); the UI's own call was cancelled.
+        if (ret instanceof settlement.room.main.TmpArea area)
+            area.clear();
     }
 
     private static Method method(String key) throws ReflectiveOperationException {

@@ -48,6 +48,7 @@ public final class ServerLoadingState extends MpConnectionState {
         w.writeInt(server.worldData.cmds.size());
         for (byte[] cmd : server.worldData.cmds)
             w.writeBytes(cmd);
+        w.writeString(server.worldData.hostTitles);
         connection.send(Packets.SERVER_WORLD_DATA, w);
         MpLog.info("sent world data to " + player.username()
                 + " (" + server.worldData.savedGame.length + "b save, "

@@ -77,6 +77,58 @@ format change beyond the FIXED tool state (protocol 10).
    two calls inside `renderPlaceHolder` are redirected to
    `UiRedirects.autoWallsLocal` (local only); the toggle button stays synced.
 
+## The two-PC desync (found after eleven traced runs)
+
+Every local pair run was clean while the two real PCs desynced ~7 s after
+unpausing, always as one worker's AI decision. The chase, in order, each
+step a real bug: plan mode (10), the UI-refreshed boosters (11), the
+process-wide employee-list cache (12), and finally the cause (13).
+
+10. **Plan mode is per client.** `JOBS().planMode` is a plain boolean
+    toggled by the Planning button (Options.java:82), never saved or synced;
+    a new construction reads it for its `active` flag (ConstructionInstance.
+    java:145) and `Placer.place` for the job state. Carried with every TOOL
+    and SYNC_AUTO command next to `Job.overwrite` (also newly carried: job
+    placement consults it, Placer.java:56) and executed with the issuer's
+    values. Protocol 11/12.
+11. **Lazily refreshed class-level boosters.** `RoomUpgrades`, `RoomIrrigated`,
+    `ROOM_WATER` (`vGet(HCLASS_RACE)`, 120-tick `ci` cache), `ROOM_POLICE`
+    (per tick) and `StatsMultipliers.maxAmount` refresh on whichever access
+    comes first, a UI panel or the sim; each client's cached value had a
+    different age. `GAME.updateI()` inside those classes is redirected to
+    `Determinism.uncachedUpdateI` (always stale in MP → pure recompute).
+12. **Process-wide tick-keyed caches.** `RoomEmploymentIns.employees(ins)`
+    (static `employeesI/employeesO`), `EUpdater.aI`, the world-region supply
+    and race caches: a UI read fills them at the render's updateI and the
+    next sub-step (same updateI; commands run in between, and updateI never
+    moves while paused) trusts them. `CacheReset.invalidate()` before every
+    sub-step and after every command.
+13. **Titles: per-player meta-progression in the simulation.** `PTitles`
+    reads `saves/profile/Titles2.txt` (PTitles.java:100-130): the races each
+    title was unlocked with. Potency `0.5 + 0.5*raceValue/races`
+    (PTitles.java:140) multiplies every worker's production and consumption
+    through the "Titles" booster (`IndustryUtil.calcProductionRate`). The
+    host had ARTISAN with two races, the joiner none: the same worker
+    produced at 0.133 vs 0.100, a workshop input pile crossed its next whole
+    unit one cycle earlier on one PC, and the fetch-or-work decision
+    diverged. `TitleSync`: the host's title data travels with the world data
+    (`WorldData.hostTitles`, protocol 13) and is applied after every load in
+    the session. Verified: the first clean two-PC session of the day.
+
+Diagnostics that made this possible (all dev-only, behind flags):
+`-Dsyxmp.enttrace=1` now logs the full AI state/module/plan bytes, work
+activations and cycles (`WA`/`WR`), the deposit job's tile data (`DB`/`DR`),
+and every booster value in the production rate (`PR`); `-Dsyxmp.hashevery=N`
+hashes every savable (and each SETT city resource, TMAP layer and two unsaved
+maps) every N timer units on the host; the host dumps its trace ring when a
+desync is reported or a player disconnects; the resync waits a second so the
+report survives the Steam close. `DevAuto`: `-Dsyxmp.autobuild=1` (joiner
+builds a hunters' lodge: stage, area, items, doors, construct),
+`-Dsyxmp.autorefurnish`, `-Dsyxmp.autocamera=x,y`, `-Dsyxmp.autounpause.delay`,
+`-Dsyxmp.autohost.nounpause`. Lesson for the next one: when the local pair is
+clean and the two PCs are not, the difference is per-machine input, and the
+hash/entity/booster traces find it in a few runs.
+
 ## Verification
 
 - `test.sh` headless suite (all redirect replacements resolve, hooks apply).

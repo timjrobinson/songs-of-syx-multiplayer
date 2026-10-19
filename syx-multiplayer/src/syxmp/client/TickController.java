@@ -85,6 +85,7 @@ public final class TickController {
         syxmp.steam.SteamMp.pump();
         MainThread.drain();
         syxmp.sync.SyncActions.frame();
+        syxmp.desync.SyncCoordinator.frame();
         DevAuto.gameTick();
 
         if (!Multiplayer.active()) {
@@ -200,6 +201,7 @@ public final class TickController {
             if (cmd.ticks < timer)
                 MpLog.err("late command " + cmd + " at timer " + timer);
             CommandExecutor.execute(cmd);
+            CacheReset.invalidate();
             if (yieldForReload) {
                 // The game is about to be replaced by its own capture taken
                 // at this exact point; the remaining commands of this unit
@@ -247,6 +249,7 @@ public final class TickController {
         syxmp.dev.RndTrace.beginSubStep(GAME.updateI(), timer);
         try {
             RND.setSeed(mixSeed(Multiplayer.session.rngSeed, GAME.updateI()));
+            CacheReset.invalidate();
             // GAME.update(double) is the vanilla manual-tick entry
             // (GAME.java:235: SPEED.speedSet(1.0); game.update(seconds, 0)).
             GAME.update(TickRate.SUBSTEP_DS);

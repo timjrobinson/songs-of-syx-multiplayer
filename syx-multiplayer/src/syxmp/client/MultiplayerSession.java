@@ -26,6 +26,8 @@ public final class MultiplayerSession {
 
     /** Deterministic base seed for the session's RNG discipline. */
     public long rngSeed;
+    /** The host's title unlock data (TitleSync), applied after every load in the session. */
+    public String hostTitles = "";
 
     /** Commands scheduled for future ticks, in arrival (= execution) order. */
     public final Queue<ScheduledCommand> cmds = new ArrayDeque<>();

@@ -85,6 +85,9 @@ public final class ServerPlayingState extends MpConnectionState {
                 int atTimer = data.readInt();
                 player.status = ServerPlayer.Status.DESYNCED;
                 MpLog.err("player " + player.username() + " desynced at " + atTimer);
+                // The host's own trace ring, dumped here rather than from the player-list update,
+                // which can arrive after the desynced player has already disconnected (no dump).
+                syxmp.dev.RndTrace.dumpRing("player " + player.username() + " reported desync at " + atTimer);
                 if (server.settings.pauseOnDesync)
                     server.commands.pauseAll();
                 server.playerManager.sendPlayerList();

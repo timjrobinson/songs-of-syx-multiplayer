@@ -49,6 +49,7 @@ public final class ClientLoadingState extends MpConnectionState {
                     byte[] cmdBytes = data.readBytes();
                     session.cmds.add(ScheduledCommand.deserialize(new ByteReader(cmdBytes)));
                 }
+                session.hostTitles = data.readString(1 << 20);
                 session.receivedCmds = sentCmds;
                 session.remoteSentCmds = sentCmds;
                 session.remoteTickUntil = tickUntil;
