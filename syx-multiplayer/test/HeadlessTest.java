@@ -44,6 +44,7 @@ public final class HeadlessTest {
         testUiStateHooks();
         testGeneratedBattleHooks();
         testBattleOrderCodec();
+        testNameSyncWithoutGame();
         testJoinFlowOverTcp();
         System.out.println(failures == 0 ? "ALL TESTS PASSED" : failures + " FAILURES");
         System.exit(failures == 0 ? 0 : 1);
@@ -416,6 +417,31 @@ public final class HeadlessTest {
         java.lang.reflect.Field f = o.getClass().getDeclaredField(name);
         f.setAccessible(true);
         return f.get(o);
+    }
+
+    /** The StringInputSprite redirects run for the MP menu's own input fields: a session exists (join from the
+     *  main menu) but no game, so the owner scan must not touch FACTIONS/SETT/WORLD (0.3.3 crashed every menu join). */
+    static void testNameSyncWithoutGame() throws Exception {
+        System.out.println("testNameSyncWithoutGame");
+        MultiplayerSession session = new MultiplayerSession();
+        session.username = "tester";
+        Multiplayer.session = session;
+        try {
+            check(Multiplayer.shouldSync(), "session without a game is interface context");
+            check(!Multiplayer.gameExists(), "no game exists headless");
+            snake2d.util.sprite.text.Str s = new snake2d.util.sprite.text.Str(32);
+            syxmp.sync.NameSync.inputClear(s);
+            syxmp.sync.NameSync.inputAdd(s, "192.168.1.2");
+            syxmp.sync.NameSync.inputAddChar(s, '3');
+            check(s.toString().equals("192.168.1.23"), "input Str edited locally (" + s + ")");
+            check(syxmp.sync.NameSync.strClear(s) == s && syxmp.sync.NameSync.strAdd(s, "x").toString().equals("x"),
+                    "UIDivEditor redirects pass through without a game");
+            snake2d.util.color.ColorImp c = new snake2d.util.color.ColorImp(1, 2, 3);
+            syxmp.sync.NameSync.setRed(c, 200);
+            check((c.red() & 0xFF) == 200, "colour edited locally without a game");
+        } finally {
+            Multiplayer.session = null;
+        }
     }
 
     static void testJoinFlowOverTcp() throws Exception {
