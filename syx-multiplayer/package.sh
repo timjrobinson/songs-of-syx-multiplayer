@@ -3,12 +3,14 @@
 # Set SYXMP_VERSION to control the version (releases do); default dev-<sha>.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJ="$(dirname "$ROOT")"
 SYX_INSTALL="${SYX_INSTALL:-1}" "$ROOT/build.sh" >/dev/null
 VER="$(cat "$ROOT/out/VERSION")"
 STAGE="$ROOT/out/dist/SyxMultiplayer"
 rm -rf "$ROOT/out/dist"; mkdir -p "$STAGE/V71/script" "$ROOT/dist"
 cp "$ROOT/out/_Info.txt" "$STAGE/_Info.txt"
 cp "$ROOT/mod/README.txt" "$STAGE/README.txt"
+cp "$PROJ/LICENSE" "$STAGE/LICENSE.txt"
 cp "$ROOT/out/SyxMultiplayer.jar" "$STAGE/V71/script/SyxMultiplayer.jar"
 ZIP="$ROOT/dist/SyxMultiplayer-$VER.zip"
 rm -f "$ZIP"

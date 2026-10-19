@@ -180,3 +180,8 @@ make test                                                        # build, headle
 
 Reference targets: Songs of Syx **V71.44** (Java 16 bytecode on the bundled
 Temurin 21 JRE); RimWorld Multiplayer **0.11.5**, wire protocol 54.
+
+## License
+
+[MIT](LICENSE). The bundled [ASM](https://asm.ow2.io/) library is BSD-3-Clause.
+Songs of Syx itself is not included: you need your own copy of the game.
