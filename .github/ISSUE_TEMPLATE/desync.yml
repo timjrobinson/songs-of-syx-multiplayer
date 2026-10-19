@@ -1,0 +1,83 @@
+name: Desync report
+description: The players' games drifted apart ("DESYNC" message / a player was resynced or kicked)
+title: "[Desync] "
+labels: [desync]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. A desync means two players' simulations computed different results for the same tick. To find out why we need the mod's logs from **every** machine in the session (host and each joiner): the desync report compares the host's view with the joiner's, and only one side is on each PC.
+
+        **Where the files are** (the `<data>` folder is where the game keeps its saves and settings):
+
+        | OS | `<data>` |
+        |---|---|
+        | Windows | `%AppData%\songsofsyx` (paste that into the Explorer address bar) |
+        | Linux | `~/.local/share/songsofsyx` |
+        | Linux, Steam snap | `~/snap/steam/common/.local/share/songsofsyx` |
+        | Linux, Steam Flatpak | `~/.var/app/com.valvesoftware.Steam/.local/share/songsofsyx` |
+        | Linux, game run through Proton | `<steam library>/steamapps/compatdata/1162750/pfx/drive_c/users/steamuser/AppData/Roaming/songsofsyx` |
+        | macOS | `~/Library/Application Support/songsofsyx` |
+
+        Inside it, from **each** machine:
+        - `logs/syxmp.log` (and `logs/syxmp.log.1` if the session spans a restart) — the mod's log. Lines containing `UNSYNCED (local only)` name an action that is not synced yet; lines with `error executing`, `gone` or `ignored` are also interesting.
+        - `logs/syxmp-desync-<timestamp>.txt` — written the moment a desync is detected. Attach the one(s) from the time of the incident.
+        - Optional but very helpful: the host's save from around the time of the desync (`saves/saves/<name>.save`).
+
+        Zip them per machine (e.g. `host-logs.zip`, `joiner-logs.zip`) and drag the zips into the text box below. Please do not paste the whole log inline.
+  - type: input
+    id: version
+    attributes:
+      label: Mod version
+      description: Shown in the main menu's MULTIPLAYER screen and on the first line of `syxmp.log` ("Syx Multiplayer X.Y.Z loaded"). Every player must run the same version.
+      placeholder: "0.3.4"
+    validations:
+      required: true
+  - type: input
+    id: game-version
+    attributes:
+      label: Game version
+      description: Songs of Syx version (bottom of the main menu, e.g. V71.44).
+      placeholder: "V71.44"
+    validations:
+      required: true
+  - type: textarea
+    id: machines
+    attributes:
+      label: Machines
+      description: One line per player — OS, how the game is launched (Steam native / Steam Proton / standalone), host or joiner, and whether any other mods are enabled.
+      placeholder: |
+        Host: Windows 11, Steam, no other mods
+        Joiner: Ubuntu 24.04, Steam (snap), no other mods
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What were the players doing right before the desync?
+      description: Be as specific as you can — which menus/tools, battles, events, trade, world map actions. Who clicked what, and roughly when (the game clock or real time helps us line it up with the logs).
+    validations:
+      required: true
+  - type: dropdown
+    id: repeat
+    attributes:
+      label: Does it happen again?
+      options:
+        - Every time we do that action
+        - Often, not always
+        - Happened once
+        - Have not tried again
+    validations:
+      required: true
+  - type: textarea
+    id: after
+    attributes:
+      label: What happened after the desync?
+      description: E.g. "the joiner reconnected automatically after ~15 s and play continued", "the joiner was kicked", "both games froze".
+  - type: textarea
+    id: files
+    attributes:
+      label: Log files
+      description: Drag and drop the zipped `syxmp.log` + `syxmp-desync-*.txt` from EACH machine here. If a file is too big, zip it; GitHub accepts zips up to 25 MB.
+    validations:
+      required: true

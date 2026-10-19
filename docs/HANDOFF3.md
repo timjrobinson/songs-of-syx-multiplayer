@@ -108,8 +108,8 @@ this session executed; its sections are referenced below as "H2 §n".
 3. **Paused-step unsaved state** (above) if cache staleness while paused
    bothers players.
 4. **Steam** (H2 §5) unchanged: opt-in, untested.
-5. the second test PC must receive the new jar (`scp` per CLAUDE.md "Working
-   agreements"); both games must be restarted; the agent line in her
+5. The second test PC must receive the new jar (per CLAUDE.md "Working
+   agreements"); both games must be restarted; the agent line in its
    `LauncherSettings.txt` already exists from session 2.
 6. The `ObjectPaths` index with depth 12 is rebuilt lazily (2 s cooldown);
    if the "object path index" log line shows TRUNCATED or >300 ms on big

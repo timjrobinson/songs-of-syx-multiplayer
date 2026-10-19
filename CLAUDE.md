@@ -23,36 +23,47 @@ Songs of Syx data."
 
 ## Environment
 
-- Game install: `/mnt/games/SteamLibrary/steamapps/common/Songs of Syx/`
+- Game install dir: configured per machine in `syx-multiplayer/local.env`
+  (`SYX_GAME_DIR`; gitignored, see `local.env.example`). Machine-specific
+  notes (paths, test PCs, addresses) live in `CLAUDE.local.md` (gitignored);
+  never put them in this file or in `docs/` — the repo is public.
   - `SongsOfSyx.jar` — the game (Java 16 bytecode, main class `init.Main`)
   - `info/SongsOfSyx-sources.jar` — **the game ships full Java sources**; extracted
     to `reference/syx-sources/` (gitignored). Always read these instead of guessing.
   - Game version: **V71.44** (`game/VERSION.java`)
   - Bundled JRE: Temurin 21 (Windows build — on Linux the game runs via
     Proton/Steam or system Java)
-- User data dir (native Linux): `~/.local/share/songsofsyx/` (`mods/`, `saves/`, `settings/`, `logs/`)
-- **Steam runs the game through Proton on this PC** (native menu fails here), so the
-  REAL player data lives in the Wine prefix:
-  `/mnt/games/SteamLibrary/steamapps/compatdata/1162750/pfx/drive_c/users/steamuser/AppData/Roaming/songsofsyx/`
-  (`build.sh` installs the jar there too; its `LauncherSettings.txt` carries the
-  `-javaagent:C:/users/steamuser/.../SyxMultiplayer.jar` line with forward slashes).
-- Second test machine: the second tester's Ubuntu PC, native Steam (snap) but data in
-  `~/.local/share/songsofsyx/`; `ssh user@<second-pc>` (key auth works);
-  game dir `~/snap/steam/common/.local/share/Steam/steamapps/common/Songs of Syx`
-  with its own bundled JRE 21 (no system java). LAN: this PC <this-pc-ip>.
+- User data dir: Windows `%AppData%\songsofsyx`, Linux
+  `~/.local/share/songsofsyx/` (Steam snap/Flatpak and Proton prefixes differ,
+  see README), macOS `~/Library/Application Support/songsofsyx` (`mods/`,
+  `saves/`, `settings/`, `logs/`). When Steam runs the game through Proton the
+  real player data lives in the Wine prefix
+  (`<library>/steamapps/compatdata/1162750/pfx/drive_c/users/steamuser/AppData/Roaming/songsofsyx/`);
+  `build.sh` installs into extra dirs listed in `SYX_EXTRA_MODS_DIRS`.
 - The mod writes its own log: `<data>/logs/syxmp.log` on every machine.
-- Launcher settings: `~/.local/share/songsofsyx/settings/LauncherSettings.txt`
+- Launcher settings: `<data>/settings/LauncherSettings.txt`
   (JSON-ish; has user-editable `JVM_ARGS2` array — our path to `-javaagent` if
   needed — plus `MODS` list, `DEVELOPER`/`DEBUG` flags)
-- Build JDK: `tools/jdk21` (gitignored Temurin download). No system JDK — only JREs.
+- Build JDK: `tools/jdk21` (gitignored Temurin download via
+  `syx-multiplayer/setup-tools.sh --jdk`), else `JAVA_HOME`/`PATH`.
+  ASM 9.7.1 at `tools/asm-9.7.1.jar` (same script).
 - RimWorld Multiplayer clone: `reference/Multiplayer` (gitignored), v0.11.5, protocol 54.
 
 ## Build & install
 
 `syx-multiplayer/build.sh` — javac `--release 17` against the game jar,
-jars it, installs to `~/.local/share/songsofsyx/mods/SyxMultiplayer/`
-(`_Info.txt` + `V71/script/SyxMultiplayer.jar`). Mod folder layout and
-`_Info.txt` format are per `info/MAKE_A_MOD.txt`.
+jars it, installs to `<data>/mods/SyxMultiplayer/` (`_Info.txt` +
+`V71/script/SyxMultiplayer.jar`) plus `.mp-test-home` and
+`SYX_EXTRA_MODS_DIRS`. Config via env/`local.env` (see the script header);
+`SYX_INSTALL=0` builds only (CI). Mod folder layout and `_Info.txt` format
+are per `info/MAKE_A_MOD.txt`.
+
+**Versioning**: `MpVersion.VERSION` is read from the `syxmp/version.txt`
+resource that `build.sh` writes (`SYXMP_VERSION`, default `dev-<sha>`);
+`_Info.txt` VERSION is filled the same way. Releases are cut by
+`.github/workflows/release.yml` on every push to `main`: latest `vX.Y.Z` tag
++ 1 patch (first release 0.3.3), tag + GitHub release with the zip. Never
+hand-edit a version number; bump minor/major by pushing a tag.
 
 ## How Songs of Syx mods load (script mods)
 
@@ -318,9 +329,13 @@ are synced; generated tactical battles (engage) run in lockstep with the
 battle exit/restart loads handled like join-point reloads; the raid-demand
 pay/decline is one synced decision (the session-3 tribute redirect had never
 linked — every CallRedirect replacement is now resolved by the headless
-suite). Version 0.3.3, protocol 9. Only the scripted pair soak has
-exercised the new paths; human play-test pending (engage especially).
-Remaining local by design: developer buttons, profile colour masks.
+suite). Protocol 9; first GitHub release 0.3.3 (versions now come from git
+tags, see "Build & install"). Only the scripted pair soak has exercised the
+new paths; human play-test pending (engage especially). Remaining local by
+design: developer buttons, profile colour masks. Session 5 (2026-10-19):
+repo made public on GitHub (`timjrobinson/songs-of-syx-multiplayer`) with CI
+on PRs, auto-release on `main`, issue templates; build scripts made
+machine-independent (`local.env`).
 
 ## Status at the end of session 3 (2026-10-18)
 
@@ -370,7 +385,7 @@ version 0.3.0, protocol 6.
 
 - `syx-multiplayer/e2e/run-pair.sh [jvm flags]` launches host + joiner windowed
   side by side (both homes are set to windowed 1920x1080; the user wants it
-  that way). `JOINER_MODE=menu` tests the main-menu join. `watch.sh`,
+  that way). Needs `SYX_GAME_DIR` in `local.env` and `xdotool`. `JOINER_MODE=menu` tests the main-menu join. `watch.sh`,
   `difftrace.sh`, `diffdesync.sh`, `diffload.sh` do the analysis. Flags:
   `-Dsyxmp.rndtrace=1 -Dsyxmp.noresync=1 -Dsyxmp.autoact=1 -Dsyxmp.autospeed=5
   -Dsyxmp.autohash=1 -Dsyxmp.enttrace=1 -Dsyxmp.trace=1 -Dsyxmp.autounpause=1`.
@@ -382,16 +397,22 @@ version 0.3.0, protocol 6.
   not produce files when sent via xdotool.
 - `./test.sh` runs the headless suite AND installs the jar (atomically — safe
   while instances run; the old inode stays mapped). Never copy over the jar
-  in place.
+  in place. CI runs the same suite (`.github/workflows/ci.yml`) with the game
+  jar fetched from the `SYX_GAME_JAR_URL` secret.
 
 ## Working agreements
 
-- Commit incrementally at each meaningful milestone.
+- **All changes go through pull requests into `main`** (branch protection;
+  no direct pushes). Branch from `main`, commit incrementally at each
+  meaningful milestone, open a PR (`gh pr create`), let CI pass, merge.
+  Every merge to `main` auto-releases a patch version; `[skip release]` in
+  the merge commit message prevents that.
+- The repo is public: no personal data, addresses, hostnames or machine
+  paths in committed files. Those go in `CLAUDE.local.md` / `local.env`.
 - When a build is meant for the players, deploy it everywhere: `./test.sh`
-  (installs native + Proton prefix + `.mp-test-home`), `./package.sh` (zip),
-  and `scp out/SyxMultiplayer.jar` to the second test PC
-  (`~/.local/share/songsofsyx/mods/SyxMultiplayer/V71/script/`, via a temp
-  name + `mv`). Tell the user both games must be restarted.
+  (installs into every configured mods dir + `.mp-test-home`),
+  `./package.sh` (zip), and copy the jar to the second test machine
+  (see `CLAUDE.local.md`). Tell the user both games must be restarted.
 - The user is often at the machine using the test instances; their key
   presses show up as synced commands in the logs. Don't launch instances
   while they are playing for real.

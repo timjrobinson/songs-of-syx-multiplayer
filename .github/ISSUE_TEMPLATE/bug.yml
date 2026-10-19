@@ -1,0 +1,72 @@
+name: Crash / bug report
+description: The game crashed, failed to start, could not host/join, or something in multiplayer misbehaves (not a desync)
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For desyncs ("DESYNC" message, players drifting apart) please use the **Desync report** template instead.
+
+        **Where the files are** (the `<data>` folder is where the game keeps its saves and settings):
+
+        | OS | `<data>` |
+        |---|---|
+        | Windows | `%AppData%\songsofsyx` (paste that into the Explorer address bar) |
+        | Linux | `~/.local/share/songsofsyx` |
+        | Linux, Steam snap | `~/snap/steam/common/.local/share/songsofsyx` |
+        | Linux, Steam Flatpak | `~/.var/app/com.valvesoftware.Steam/.local/share/songsofsyx` |
+        | Linux, game run through Proton | `<steam library>/steamapps/compatdata/1162750/pfx/drive_c/users/steamuser/AppData/Roaming/songsofsyx` |
+        | macOS | `~/Library/Application Support/songsofsyx` |
+
+        Please attach, from the machine that had the problem (and from the host too if you were joining):
+        - `<data>/logs/syxmp.log` — the mod's log (also `syxmp.log.1` if present).
+        - The game's own crash log: `<data>/logs/` contains the game's error reports; for a hard JVM crash also look for `hs_err_pid*.log` next to the game's executable or in the game install folder.
+        - `<data>/settings/LauncherSettings.txt` if the game does not start at all (the mod adds a `-javaagent:` line to it; a wrong path there prevents the game from starting — see the README's troubleshooting section).
+  - type: input
+    id: version
+    attributes:
+      label: Mod version
+      description: Shown in the main menu's MULTIPLAYER screen and on the first line of `syxmp.log`.
+      placeholder: "0.3.4"
+    validations:
+      required: true
+  - type: input
+    id: game-version
+    attributes:
+      label: Game version
+      placeholder: "V71.44"
+    validations:
+      required: true
+  - type: textarea
+    id: machines
+    attributes:
+      label: Machine(s)
+      description: OS, how the game is launched (Steam native / Steam Proton / standalone), host or joiner, other mods enabled.
+      placeholder: |
+        Joiner: Windows 10, Steam, no other mods
+        Host: macOS 15, standalone
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, what happened instead. Any error text shown on screen, verbatim.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Host a saved game from the main menu
+        2. On the second PC, join with the host's LAN address
+        3. ...
+  - type: textarea
+    id: files
+    attributes:
+      label: Log files
+      description: Drag and drop `syxmp.log`, the game's crash log and (if relevant) `LauncherSettings.txt` here. Zip them if large.
+    validations:
+      required: true

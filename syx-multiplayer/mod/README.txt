@@ -1,8 +1,11 @@
-Syx Multiplayer 0.3 — co-op multiplayer for Songs of Syx (V71)
-================================================================
+Syx Multiplayer — co-op multiplayer for Songs of Syx (V71)
+============================================================
 
 Every player needs: the same game version (V71.44), this exact mod version,
 and the mod ENABLED in the launcher's Mods tab.
+
+Full guide, troubleshooting and issue reporting:
+  https://github.com/timjrobinson/songs-of-syx-multiplayer
 
 INSTALL (every PC)
   1. Unzip so that you get this folder layout inside the game's mods folder:
@@ -12,7 +15,9 @@ INSTALL (every PC)
         Windows:  %AppData%\songsofsyx\mods
         Linux:    ~/.local/share/songsofsyx/mods
                   (Steam snap: ~/snap/steam/common/.local/share/songsofsyx/mods
-                   Flatpak:    ~/.var/app/com.valvesoftware.Steam/.local/share/songsofsyx/mods)
+                   Flatpak:    ~/.var/app/com.valvesoftware.Steam/.local/share/songsofsyx/mods
+                   Proton:     <steam library>/steamapps/compatdata/1162750/pfx/drive_c/
+                               users/steamuser/AppData/Roaming/songsofsyx/mods)
         macOS:    ~/Library/Application Support/songsofsyx/mods
   2. Start the game and enable "Syx Multiplayer" in the launcher's Mods tab.
   3. The first time the game starts with the mod enabled, the mod writes
@@ -37,7 +42,7 @@ HOSTING
   Or: while playing, Esc > multiplayer > "host this game".
   The other players need to reach that port: same LAN works out of the box
   (allow the game through the firewall when asked); over the internet,
-  forward the port on the host's router.
+  forward the port on the host's router or use a VPN-style tool.
 
 JOINING
   Main menu > MULTIPLAYER > enter the host's address (e.g. 192.168.1.20 or
@@ -49,33 +54,26 @@ IN GAME
   shows players, latency and lets you leave. Chat commands: /players,
   /help; host only: /kick <name>, /joinpoint (fresh join baseline).
 
-WHAT TO EXPECT (version 0.3)
+WHAT TO EXPECT
   - One shared settlement, everybody controls everything. Speed/pause is
     shared. Autosave is off while in multiplayer: save through the menu;
     the host's save is the authoritative one.
-  - Synced: all map tools (designations, rooms, items, jobs), room placement
-    (one player plans a room at a time), room settings (lock, delete,
-    upgrade/downgrade, workers, auto-employ, radius, recipes, crops,
-    animals, stockpile/hauler/export/import/transport/supply settings,
-    food/drink choices), work priorities, immigration, laws, curfew,
-    punishments, decrees (slavery, persecution, handouts, day off,
-    overtime), standing/access/policies, education, rations, rename and
-    ennoble people, nobles' offices, divisions (create/edit/send out/
-    recall/guard duty), world army orders (move, intercept, besiege, stop,
-    raid, disband, reorganize), region buildings, region squeeze/abandon,
-    garrison attack, diplomacy deals (accept/incoming), court emissaries,
-    research, event choices, tribute payments, player banner.
-  - NOT synced yet (using them will desync; the mod detects it and the
-    drifted client rejoins automatically, 10-20 s): tactical battle orders
-    (move/attack orders to divisions during a fight), world battle prompts
-    (fight/auto-resolve/retreat), recruiting world armies and mercenaries,
-    granting autonomy, renaming divisions/regions/armies, copying a single
-    room or placing saved blueprints, the "assign race/home" tools.
+  - Nearly every action the UI offers is synced: map tools, rooms and all
+    room settings, work priorities, laws, decrees, policies, research,
+    events, diplomacy and tribute, divisions and world armies, recruiting,
+    tactical battle orders, world battle prompts (including generated
+    tactical battles), renames, colours, map marks, home/workplace
+    assignment, move orders, room copy and saved prints.
+  - Still local by design: developer/debug buttons and profile colour masks.
+  - A desync (the mod detects it; the drifted client rejoins automatically,
+    10-20 s) means a bug. Please report it with the logs (below).
   - Steam friends list / "Join Game" exists but is off by default
     (steam=1 in <data>/settings/SyxMultiplayer.txt) and untested.
 
 LOGS / REPORTING
   <data>/logs/syxmp.log on every machine. On a desync a report
-  syxmp-desync-<time>.txt is written next to it. Send the host's and the
-  joiner's files along with what you were doing. Lines "UNSYNCED (local
+  syxmp-desync-<time>.txt is written next to it. Open an issue at
+  https://github.com/timjrobinson/songs-of-syx-multiplayer/issues using the
+  "Desync report" or "Crash / bug report" template and attach the host's and
+  the joiner's files along with what you were doing. Lines "UNSYNCED (local
   only)" name an action that still needs syncing.

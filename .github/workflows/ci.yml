@@ -1,0 +1,86 @@
+# Build the mod against the game jar and run the headless test suite.
+# Runs on every pull request, and on main via release.yml (workflow_call).
+#
+# The game is proprietary, so the game jar cannot live in this repository.
+# CI downloads it from the SYX_GAME_JAR_URL repository secret (optionally
+# with SYX_GAME_JAR_TOKEN sent as a bearer token). Pull requests from forks do
+# not receive secrets: for those the build is skipped with a warning and the
+# tests run once the PR is merged.
+name: CI
+
+on:
+  pull_request:
+  workflow_call:
+    inputs:
+      version:
+        description: Version string to bake into the build (releases pass X.Y.Z)
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Fetch ASM
+        run: syx-multiplayer/setup-tools.sh
+
+      - name: Fetch the game jar
+        id: game
+        env:
+          URL: ${{ secrets.SYX_GAME_JAR_URL }}
+          TOKEN: ${{ secrets.SYX_GAME_JAR_TOKEN }}
+        run: |
+          if [ -z "$URL" ]; then
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "::warning::SYX_GAME_JAR_URL secret is not available (fork PR?) — build and tests skipped"
+              echo "Build and tests skipped: the game jar secret is not available to this run." >> "$GITHUB_STEP_SUMMARY"
+              echo "available=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::error::SYX_GAME_JAR_URL secret is not set. Add it under Settings > Secrets and variables > Actions (see CONTRIBUTING.md)."
+            exit 1
+          fi
+          mkdir -p game
+          if [ -n "$TOKEN" ]; then
+            curl -sSfL -H "Authorization: Bearer $TOKEN" -H "Accept: application/octet-stream" -o game/SongsOfSyx.jar "$URL"
+          else
+            curl -sSfL -o game/SongsOfSyx.jar "$URL"
+          fi
+          unzip -p game/SongsOfSyx.jar game/VERSION.class >/dev/null || { echo "::error::downloaded file is not the game jar"; exit 1; }
+          echo "available=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build and run headless tests
+        if: steps.game.outputs.available == 'true'
+        env:
+          SYX_GAME_JAR: ${{ github.workspace }}/game/SongsOfSyx.jar
+          SYX_INSTALL: '0'
+          SYXMP_VERSION: ${{ inputs.version || '' }}
+        run: syx-multiplayer/test.sh
+
+      - name: Package
+        if: steps.game.outputs.available == 'true'
+        env:
+          SYX_GAME_JAR: ${{ github.workspace }}/game/SongsOfSyx.jar
+          SYX_INSTALL: '0'
+          SYXMP_VERSION: ${{ inputs.version || '' }}
+        run: syx-multiplayer/package.sh
+
+      - name: Upload build
+        if: steps.game.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SyxMultiplayer
+          path: syx-multiplayer/dist/*.zip
+          if-no-files-found: error

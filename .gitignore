@@ -14,3 +14,8 @@ syx-multiplayer/out/
 .idea/
 .vscode/
 .mp-test-home
+
+# Per-machine notes and settings (never committed)
+CLAUDE.local.md
+syx-multiplayer/local.env
+.DS_Store

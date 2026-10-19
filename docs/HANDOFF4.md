@@ -155,6 +155,6 @@ Version 0.3.3, protocol 9. "No desyncs for anything real players use":
    prints). Most could only be exercised by hooks/redirect tests; grep both
    logs for `UNSYNCED|error executing|gone|ignored` after a session.
 3. Generated tactical battles ("engage") — design pass (above).
-4. the second test PC received 0.3.1 and 0.3.2 (scp + mv); both games must be
+4. The second test PC received 0.3.1 and 0.3.2; both games must be
    restarted after any install (a running game keeps the old jar mapped).
 5. H3 items 3 (paused-step unsaved state), 4 (Steam) unchanged.

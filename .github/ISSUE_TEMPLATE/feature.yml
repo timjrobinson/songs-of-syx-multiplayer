@@ -1,0 +1,16 @@
+name: Feature request / unsynced action
+description: Something you want the mod to do, or an action that is marked "UNSYNCED (local only)" in the log
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What would you like?
+      description: If it is an unsynced action, paste the `UNSYNCED (local only)` line from `syxmp.log` and say which button/menu you used.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why does it matter in a co-op session?

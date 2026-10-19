@@ -192,7 +192,7 @@ Host (uses the real user data dir; expects the Elote example save present in
 `~/.local/share/songsofsyx/saves/saves/` — already copied there):
 
 ```sh
-cd "/mnt/games/SteamLibrary/steamapps/common/Songs of Syx"
+cd "$SYX_GAME_DIR"   # the game install dir
 DISPLAY=:1 java \
   "-javaagent:$HOME/.local/share/songsofsyx/mods/SyxMultiplayer/V71/script/SyxMultiplayer.jar" \
   -Xms512m -Xmx4096m -Dfile.encoding=UTF-8 \

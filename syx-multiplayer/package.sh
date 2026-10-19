@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Build the mod and package a distributable zip: dist/SyxMultiplayer-<version>.zip
+# Set SYXMP_VERSION to control the version (releases do); default dev-<sha>.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-"$ROOT/build.sh" >/dev/null
-VER=$(sed -n 's/.*VERSION = "\([^"]*\)".*/\1/p' "$ROOT/src/syxmp/common/MpVersion.java")
+SYX_INSTALL="${SYX_INSTALL:-1}" "$ROOT/build.sh" >/dev/null
+VER="$(cat "$ROOT/out/VERSION")"
 STAGE="$ROOT/out/dist/SyxMultiplayer"
 rm -rf "$ROOT/out/dist"; mkdir -p "$STAGE/V71/script" "$ROOT/dist"
-cp "$ROOT/mod/_Info.txt" "$STAGE/_Info.txt"
+cp "$ROOT/out/_Info.txt" "$STAGE/_Info.txt"
 cp "$ROOT/mod/README.txt" "$STAGE/README.txt"
 cp "$ROOT/out/SyxMultiplayer.jar" "$STAGE/V71/script/SyxMultiplayer.jar"
 ZIP="$ROOT/dist/SyxMultiplayer-$VER.zip"

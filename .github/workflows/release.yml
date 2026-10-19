@@ -1,0 +1,82 @@
+# Every push to main (i.e. every merged PR) runs the tests and publishes a
+# release with the patch version bumped: the latest v* tag + 1 (or
+# FIRST_VERSION when no tag exists yet), tagged on the pushed commit, with the
+# packaged mod zip attached and auto-generated notes.
+# Put "[skip release]" in the merge commit message to skip the release (tests
+# still run).
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # Used verbatim for the very first release (no v*.*.* tag yet).
+  FIRST_VERSION: 0.3.3
+
+jobs:
+  version:
+    name: Next version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+      skip: ${{ steps.next.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: next
+        run: |
+          if git log -1 --format=%B | grep -qF '[skip release]'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+          last="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1)"
+          if [ -z "$last" ]; then
+            version="$FIRST_VERSION"
+            echo "no tag yet -> first release $version"
+          else
+            IFS=. read -r major minor patch <<< "${last#v}"
+            version="$major.$minor.$((patch + 1))"
+            echo "last tag $last -> next $version"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: Test
+    needs: version
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+    with:
+      version: ${{ needs.version.outputs.version }}
+
+  release:
+    name: Publish release
+    needs: [version, test]
+    if: needs.version.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: SyxMultiplayer
+          path: dist
+      - name: Tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          ls -l dist
+          git tag "v$VERSION" "$GITHUB_SHA"
+          git push origin "v$VERSION"
+          gh release create "v$VERSION" dist/*.zip \
+            --title "Syx Multiplayer $VERSION" \
+            --generate-notes \
+            --notes "Install: unzip into your Songs of Syx mods folder so you get \`SyxMultiplayer/_Info.txt\` and \`SyxMultiplayer/V71/script/SyxMultiplayer.jar\`; see the README for the full setup. Every player must run this exact version."

@@ -18,7 +18,7 @@ desyncs.
 
 | Area | State |
 |---|---|
-| Join from main menu / in-game, world transfer, catch-up, lockstep | Works, two real machines (this PC via Proton, the second tester's Ubuntu PC native) |
+| Join from main menu / in-game, world transfer, catch-up, lockstep | Works, two real machines (this PC via Proton, the second test PC native Ubuntu) |
 | Determinism, idle | 23 min at speed 1, zero desyncs |
 | Determinism with scripted synced actions | 20 min at speed 5, 22 actions, zero desyncs |
 | Determinism with REAL play (two humans) | "desynced a few times" in the first session; causes not yet seen (no log file existed then) |
@@ -34,7 +34,7 @@ desyncs.
 ## 1. Finding the remaining desyncs (do this first, with the humans' logs)
 
 The mod now writes `<game data>/logs/syxmp.log` on every machine. After a
-two-player session, read both files (the second test PC: `ssh user@<second-pc>`,
+two-player session, read both files (the second test PC:
 `~/.local/share/songsofsyx/logs/syxmp.log`; this PC: the Proton prefix, see
 CLAUDE.md). Look for:
 

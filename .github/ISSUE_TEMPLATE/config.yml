@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Setup help
+    url: https://github.com/timjrobinson/songs-of-syx-multiplayer#getting-started-players
+    about: Installation, hosting and joining are explained in the README. Please read it before opening an issue.
