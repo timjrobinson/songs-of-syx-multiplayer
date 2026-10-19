@@ -176,3 +176,9 @@ instance per frame. `HeadlessTest.testNameSyncWithoutGame` reproduces the
 crash (session set, no game). Lesson: any redirect placed on a generic
 snake2d/util widget class runs in the main menu — guard with
 `gameExists()`, not just `shouldSync()`.
+
+Same session: Steam integration made default-on after the "Steam-snap JVM
+crash" was root-caused to steamworks4j's shared native extraction path
+(`docs/HANDOFF2.md` §5, `steam/SteamNatives`). Lobby/P2P joining between
+the two test PCs is still to be play-tested (Proton host, native Linux
+joiner).

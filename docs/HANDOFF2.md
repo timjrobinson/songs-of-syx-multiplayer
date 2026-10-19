@@ -24,7 +24,7 @@ desyncs.
 | Determinism with REAL play (two humans) | "desynced a few times" in the first session; causes not yet seen (no log file existed then) |
 | Auto-resync after desync | Works (drops + rejoins, ~10–20 s) |
 | Cursors, chat, player list, HUD, escape-menu entry, menu screen | Work (visually verified in screenshots) |
-| Steam lobbies / friends / P2P | Implemented, OPT-IN, never tested; crashes the JVM on Steam-snap Ubuntu |
+| Steam lobbies / friends / P2P | Implemented; ON by default since session 5 (the JVM crash was the shared native path, fixed — §5); lobby/P2P flow not yet play-tested |
 | Sync coverage of player actions | THIN — see §2 |
 | Battles | Unsupported |
 | Packaging | `syx-multiplayer/package.sh` → `dist/SyxMultiplayer-<ver>.zip`; agent auto-install on first run (unreliable, see §4) |
@@ -242,6 +242,23 @@ command.
 ---
 
 ## 5. Steam
+
+**Resolved in session 5 (2026-10-19).** The "SIGBUS on Steam-snap Ubuntu"
+was not the Steam client: steamworks4j 1.9.0's loader extracts its natives
+to the shared `<java.io.tmpdir>/steamworks4j/1.9.0/` and rewrites them IN
+PLACE on every `loadLibraries()` in every process. The game spawns a helper
+JVM that does exactly that at startup and on every main-menu visit
+(`MainProcess.java:35`, `Menu.java:110` → `PTitles.achieve()` →
+`SteamAchieve`), so our in-process natives were truncated/rewritten while
+mapped: SIGBUS, or a jump to an unrelocated PLT stub (`pc=0x210a6`,
+`SteamAPI.runCallbacks()V+0`). Reproduced on a normal install with two
+plain JVMs. Fix: `steam/SteamNatives` loads the natives from a private
+per-process directory (unlinked right after `dlopen` on POSIX) and calls
+`SteamAPI.skipLoadLibraries()`; `HeadlessTest.testSteamNativesSurviveSharedRewrite`
+pumps callbacks while a child runs the shared loader. Steam is on by default
+(`steam=0` / `-Dsyxmp.steam=0` to disable). The game's own helper children
+still race each other on Linux (vanilla bug; achievements only). The
+paragraphs below are the original design notes.
 
 `syxmp/steam/SteamMpImpl.java` is complete in design: friends-only lobby +
 rich presence `connect` string on host, friends-hosting list in the menu,

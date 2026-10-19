@@ -33,16 +33,15 @@ public final class SteamMp {
     }
 
     /**
-     * Steam integration is OPT-IN (SyxMultiplayer.txt: steam=1). On one test
-     * machine (Steam snap on Ubuntu) SteamAPI.runCallbacks() crashed the JVM
-     * with SIGBUS inside the Steam client library — the same crash the game's
-     * own achievement helper process hits there — so the Steam API must never
-     * be touched unless the player asked for it.
+     * On by default; {@code steam=0} in SyxMultiplayer.txt or
+     * {@code -Dsyxmp.steam=0} turns it off. (It was opt-in while the JVM
+     * crashed in runCallbacks on one test machine - that was the shared
+     * native-library path steamworks4j extracts to, see {@link SteamNatives}.)
      */
     public static boolean enabled() {
         if (enabled == null)
-            enabled = "1".equals(syxmp.ui.MpSettings.get("steam", "0"))
-                    || "1".equals(System.getProperty("syxmp.steam"));
+            enabled = !"0".equals(syxmp.ui.MpSettings.get("steam", "1"))
+                    && !"0".equals(System.getProperty("syxmp.steam"));
         return enabled;
     }
 

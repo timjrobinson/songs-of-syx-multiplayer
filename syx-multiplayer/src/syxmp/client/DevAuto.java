@@ -36,6 +36,14 @@ public final class DevAuto {
     private static int areaAtFrame = -1;
     private static int stockpileStep;
 
+    /** -Dsyxmp.autorefurnish=<room index|-1>: the client with -Dsyxmp.autorefurnish.role (host|joiner, default
+     *  joiner) refurnishes that room through the room panel's button path (UIRoomPlacer.reconstruct) once both
+     *  players are in lockstep, then "constructs" it 100 frames later exactly like SFrame's OK button. */
+    private static final String AUTOREFURNISH = System.getProperty("syxmp.autorefurnish");
+    private static final String AUTOREFURNISH_ROLE = System.getProperty("syxmp.autorefurnish.role", "joiner");
+    private static int refurnishFrames;
+    private static int refurnishStep;
+
     private static int menuFrames;
     private static int gameFrames;
     private static boolean loaded, hosted, joined, unpaused;
@@ -206,6 +214,41 @@ public final class DevAuto {
             }
         } else {
             framesWithTwo = 0;
+        }
+
+        if (AUTOREFURNISH != null && refurnishStep < 2 && Multiplayer.active() && TickController.inLockstep()
+                && Multiplayer.session.players.size() >= 2
+                && Multiplayer.session.isHost == "host".equals(AUTOREFURNISH_ROLE)) {
+            refurnishFrames++;
+            if (refurnishStep == 0 && refurnishFrames >= 150) {
+                refurnishStep = 1;
+                int want = Integer.parseInt(AUTOREFURNISH);
+                settlement.room.main.RoomInstance room = null;
+                outer:
+                for (settlement.room.main.RoomBlueprintIns<?> b : settlement.main.SETT.ROOMS().ins())
+                    for (int k = 0; k < b.instancesSize(); k++) {
+                        settlement.room.main.RoomInstance r = b.getInstance(k);
+                        if (r.index() == want || (want < 0 && r.constructor() != null && r.constructor().usesArea())) {
+                            room = r;
+                            break outer;
+                        }
+                    }
+                if (room == null) {
+                    MpLog.info("[auto] no room to refurnish (" + want + ")");
+                    refurnishStep = 2;
+                    return;
+                }
+                MpLog.info("[auto] action: refurnish room #" + room.index() + " (" + room.blueprint().key + ") at "
+                        + room.mX() + "," + room.mY() + " area " + room.area());
+                view.main.VIEW.s().ui.placer.reconstruct(room);
+            } else if (refurnishStep == 1 && refurnishFrames >= 250) {
+                refurnishStep = 2;
+                settlement.room.main.placement.RoomPlacer placer = settlement.main.SETT.ROOMS().placement.placer;
+                MpLog.info("[auto] action: construct refurnished room; problem=" + placer.createProblem()
+                        + " size " + placer.size());
+                placer.create();
+                view.main.VIEW.s().tools.placer.deactivate();
+            }
         }
 
         if (areaAtFrame > 0 && gameFrames >= areaAtFrame) {
