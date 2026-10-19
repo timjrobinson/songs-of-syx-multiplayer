@@ -7,8 +7,8 @@
 - There is no CI build: the mod compiles against the game's own jar, which is
   proprietary and must never be uploaded or committed. Run
   `syx-multiplayer/test.sh` locally before opening a PR and say so in the PR.
-- **Releases are cut locally with `syx-multiplayer/release.sh`** from an
-  up-to-date `main`. It bumps the patch version (latest `vX.Y.Z` tag + 1;
+- **Releases are cut locally with `make release`** (`syx-multiplayer/release.sh`)
+  from an up-to-date `main`. It bumps the patch version (latest `vX.Y.Z` tag + 1;
   `--minor`/`--major`/an explicit version for bigger bumps), runs the headless
   tests, builds with that version baked in, tags, pushes the tag and creates
   the GitHub release with `SyxMultiplayer-X.Y.Z.zip` and notes generated from
@@ -38,14 +38,16 @@ sources in `info/SongsOfSyx-sources.jar`; unzip them to `reference/syx-sources/`
 (gitignored) and read them instead of guessing.
 
 ```sh
-cd syx-multiplayer
-./setup-tools.sh --jdk       # downloads ASM + a Temurin 21 JDK into ../tools (omit --jdk if you have JDK 21)
-cp local.env.example local.env   # set SYX_GAME_DIR (and optional install dirs)
-./test.sh                    # build, headless tests, install into your mods folder
+make setup                   # ASM (+ a Temurin 21 JDK into tools/ if you have none)
+cp syx-multiplayer/local.env.example syx-multiplayer/local.env   # set SYX_GAME_DIR (and optional install dirs)
+make test                    # build, headless tests, install into your mods folder
 ```
 
-- `./build.sh` builds and installs; `SYX_INSTALL=0 ./build.sh` only builds.
-- `./package.sh` builds the distributable zip into `dist/`.
+- `make build` builds and installs (`syx-multiplayer/build.sh`;
+  `SYX_INSTALL=0` only builds). `make package` zips into `syx-multiplayer/dist/`.
+- `make release` cuts the next patch release (see above); `BUMP=minor` /
+  `BUMP=major` / `VERSION=X.Y.Z` for other bumps, `make release-dry` to
+  rehearse. `make help` lists everything.
 - `e2e/run-pair.sh` launches a host and a joiner side by side on one PC (Linux,
   needs `xdotool`; the joiner uses the gitignored `.mp-test-home/` as its data
   dir). `e2e/watch.sh`, `difftrace.sh`, `diffdesync.sh`, `diffload.sh` analyse

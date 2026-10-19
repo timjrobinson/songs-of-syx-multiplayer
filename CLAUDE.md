@@ -51,6 +51,9 @@ Songs of Syx data."
 
 ## Build & install
 
+`make build` / `make test` / `make package` / `make release` wrap the scripts
+below (root `Makefile`; `make help`).
+
 `syx-multiplayer/build.sh` — javac `--release 17` against the game jar,
 jars it, installs to `<data>/mods/SyxMultiplayer/` (`_Info.txt` +
 `V71/script/SyxMultiplayer.jar`) plus `.mp-test-home` and
@@ -407,7 +410,7 @@ version 0.3.0, protocol 6.
   no direct pushes). Branch from `main`, commit incrementally at each
   meaningful milestone, run `test.sh`, open a PR (`gh pr create`), merge
   (`gh pr merge --squash --delete-branch`). When players should get the
-  result, run `syx-multiplayer/release.sh` on `main` afterwards.
+  result, run `make release` on `main` afterwards.
 - The repo is public: no personal data, addresses, hostnames or machine
   paths in committed files. Those go in `CLAUDE.local.md` / `local.env`.
 - When a build is meant for the players, deploy it everywhere: `./test.sh`
