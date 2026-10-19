@@ -91,6 +91,7 @@ public final class TickController {
             vanillaUpdate(game, ds, slowDown);
             return;
         }
+        syxmp.sync.RoomToolSync.invalidatePlacerCaches();
 
         // Session exists but we're still connecting/handshaking: the local
         // game keeps running vanilla until the world transfer starts.
