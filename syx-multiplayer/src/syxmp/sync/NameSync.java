@@ -44,6 +44,25 @@ public final class NameSync {
 
     private static Str pendingClear;
 
+    /**
+     * StringInputSprite's static scratch buffer (StringInputSprite.java:20):
+     * cleared and refilled on every render and key press, never a sim Str.
+     * Skipped before the owner scan so rendering an input field costs
+     * nothing (the scan walks every room instance).
+     */
+    private static final Str INPUT_TMP = inputTmp();
+
+    private static Str inputTmp() {
+        try {
+            java.lang.reflect.Field f = snake2d.util.sprite.text.StringInputSprite.class.getDeclaredField("tmp");
+            f.setAccessible(true);
+            return (Str) f.get(null);
+        } catch (ReflectiveOperationException e) {
+            MpLog.err("StringInputSprite.tmp not found", e);
+            return null;
+        }
+    }
+
     /** Start of a frame: an intercepted clear().add() pair is over by then. */
     public static void frame() {
         pendingClear = null;
@@ -52,6 +71,8 @@ public final class NameSync {
     // --- Str ------------------------------------------------------------------
 
     private static long ownerOf(Str s) {
+        if (s == INPUT_TMP || !Multiplayer.gameExists())
+            return -1;
         for (WArmy a : FACTIONS.player().armies().all())
             if (a.name == s)
                 return key(OWNER_ARMY, a.armyIndex());
@@ -197,6 +218,8 @@ public final class NameSync {
 
     /** @return {kind, index, sub} or null */
     private static int[] colorOwner(ColorImp c) {
+        if (!Multiplayer.gameExists())
+            return null;
         for (int i = 0; i < SETT.TILE_MAP().marks.all.size(); i++)
             if (SETT.TILE_MAP().marks.all.get(i).color == c)
                 return new int[] {COLOR_MARK, i, 0};

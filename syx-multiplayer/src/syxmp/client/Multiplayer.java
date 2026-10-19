@@ -44,4 +44,14 @@ public final class Multiplayer {
     public static boolean shouldSync() {
         return inInterface() && !dontSync;
     }
+
+    /**
+     * Is a game constructed? A session exists before any game does (a join
+     * from the main menu), and hooks on generic widget classes run in the
+     * menu too. VIEW is created last in the GAME constructor (GAME.java:185),
+     * after FACTIONS/SETT/WORLD/ARMIES, so its existence implies theirs.
+     */
+    public static boolean gameExists() {
+        return view.main.VIEW.existTemp();
+    }
 }

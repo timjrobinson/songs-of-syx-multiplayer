@@ -158,3 +158,21 @@ Version 0.3.3, protocol 9. "No desyncs for anything real players use":
 4. The second test PC received 0.3.1 and 0.3.2; both games must be
    restarted after any install (a running game keeps the old jar mapped).
 5. H3 items 3 (paused-step unsaved state), 4 (Steam) unchanged.
+
+## Session 5 fix (2026-10-19): menu join crashed on 0.3.3
+
+First real two-PC run of 0.3.3: the joiner crashed ~0.1s after clicking
+Join from the main menu (`NullPointerException ... FACTIONS.self is null`
+in `NameSync.ownerOf`). The StringInputSprite redirects (session 4, faction
+name typed straight into the sim Str) run for *every* input widget,
+including the MP menu's own address/name fields, and
+`StringInputSprite.render` clears its scratch Str every frame. From the menu
+a session exists before any game does, so `shouldSync()` was true and the
+owner scan dereferenced FACTIONS/SETT/WORLD. Fix: `Multiplayer.gameExists()`
+(`VIEW.existTemp()` — VIEW is built last in the GAME constructor,
+`GAME.java:185`) gates both receiver scans, and the sprite's static `tmp`
+buffer is skipped so rendering an input field no longer walks every room
+instance per frame. `HeadlessTest.testNameSyncWithoutGame` reproduces the
+crash (session set, no game). Lesson: any redirect placed on a generic
+snake2d/util widget class runs in the main menu — guard with
+`gameExists()`, not just `shouldSync()`.
