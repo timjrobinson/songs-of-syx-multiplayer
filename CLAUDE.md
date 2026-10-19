@@ -51,6 +51,9 @@ Songs of Syx data."
 
 ## Build & install
 
+`make build` / `make test` / `make package` / `make release` wrap the scripts
+below (root `Makefile`; `make help`).
+
 `syx-multiplayer/build.sh` — javac `--release 17` against the game jar,
 jars it, installs to `<data>/mods/SyxMultiplayer/` (`_Info.txt` +
 `V71/script/SyxMultiplayer.jar`) plus `.mp-test-home` and
@@ -60,10 +63,12 @@ are per `info/MAKE_A_MOD.txt`.
 
 **Versioning**: `MpVersion.VERSION` is read from the `syxmp/version.txt`
 resource that `build.sh` writes (`SYXMP_VERSION`, default `dev-<sha>`);
-`_Info.txt` VERSION is filled the same way. Releases are cut by
-`.github/workflows/release.yml` on every push to `main`: latest `vX.Y.Z` tag
-+ 1 patch (first release 0.3.3), tag + GitHub release with the zip. Never
-hand-edit a version number; bump minor/major by pushing a tag.
+`_Info.txt` VERSION is filled the same way. Releases are cut locally with
+`syx-multiplayer/release.sh` from a clean, up-to-date `main`: latest
+`vX.Y.Z` tag + 1 patch (`--minor`/`--major`/explicit; first release 0.3.3),
+tests, build, zip, tag, push tag, `gh release create` with the zip. No CI
+build exists and none can: the game jar is proprietary and is never
+uploaded or committed, nor is any built jar. Never hand-edit a version.
 
 ## How Songs of Syx mods load (script mods)
 
@@ -333,8 +338,8 @@ suite). Protocol 9; first GitHub release 0.3.3 (versions now come from git
 tags, see "Build & install"). Only the scripted pair soak has exercised the
 new paths; human play-test pending (engage especially). Remaining local by
 design: developer buttons, profile colour masks. Session 5 (2026-10-19):
-repo made public on GitHub (`timjrobinson/songs-of-syx-multiplayer`) with CI
-on PRs, auto-release on `main`, issue templates; build scripts made
+repo made public on GitHub (`timjrobinson/songs-of-syx-multiplayer`):
+PR-only `main`, issue templates, local `release.sh`; build scripts made
 machine-independent (`local.env`).
 
 ## Status at the end of session 3 (2026-10-18)
@@ -397,16 +402,15 @@ version 0.3.0, protocol 6.
   not produce files when sent via xdotool.
 - `./test.sh` runs the headless suite AND installs the jar (atomically — safe
   while instances run; the old inode stays mapped). Never copy over the jar
-  in place. CI runs the same suite (`.github/workflows/ci.yml`) with the game
-  jar fetched from the `SYX_GAME_JAR_URL` secret.
+  in place. There is no CI: `release.sh` runs this suite before publishing.
 
 ## Working agreements
 
 - **All changes go through pull requests into `main`** (branch protection;
   no direct pushes). Branch from `main`, commit incrementally at each
-  meaningful milestone, open a PR (`gh pr create`), let CI pass, merge.
-  Every merge to `main` auto-releases a patch version; `[skip release]` in
-  the merge commit message prevents that.
+  meaningful milestone, run `test.sh`, open a PR (`gh pr create`), merge
+  (`gh pr merge --squash --delete-branch`). When players should get the
+  result, run `make release` on `main` afterwards.
 - The repo is public: no personal data, addresses, hostnames or machine
   paths in committed files. Those go in `CLAUDE.local.md` / `local.env`.
 - When a build is meant for the players, deploy it everywhere: `./test.sh`

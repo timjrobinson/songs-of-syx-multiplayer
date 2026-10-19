@@ -4,14 +4,16 @@
 
 - `main` is protected. Every change goes through a pull request; nobody pushes
   to `main` directly.
-- CI (`.github/workflows/ci.yml`) builds the mod against the game jar and runs
-  the headless test suite on every PR. Merge only when it is green.
-- **Merging to `main` publishes a release**: `.github/workflows/release.yml`
-  runs the tests again, bumps the patch version (latest `vX.Y.Z` tag + 1),
-  tags the merge commit, and attaches `SyxMultiplayer-X.Y.Z.zip` with
-  auto-generated notes. Put `[skip release]` in the merge commit message to
-  merge without shipping. To bump minor/major, tag the merge commit yourself
-  (`git tag v0.4.0 && git push --tags`) and the next merge continues from there.
+- There is no CI build: the mod compiles against the game's own jar, which is
+  proprietary and must never be uploaded or committed. Run
+  `syx-multiplayer/test.sh` locally before opening a PR and say so in the PR.
+- **Releases are cut locally with `make release`** (`syx-multiplayer/release.sh`)
+  from an up-to-date `main`. It bumps the patch version (latest `vX.Y.Z` tag + 1;
+  `--minor`/`--major`/an explicit version for bigger bumps), runs the headless
+  tests, builds with that version baked in, tags, pushes the tag and creates
+  the GitHub release with `SyxMultiplayer-X.Y.Z.zip` and notes generated from
+  the merged PRs. `--dry-run` builds without tagging or publishing. Nothing
+  built is ever committed; `dist/` and `out/` are gitignored.
 - Keep commits focused; the generated release notes are built from PR titles,
   so make titles say what changed for players ("Sync hospital fetch orders",
   not "fixes").
@@ -36,35 +38,19 @@ sources in `info/SongsOfSyx-sources.jar`; unzip them to `reference/syx-sources/`
 (gitignored) and read them instead of guessing.
 
 ```sh
-cd syx-multiplayer
-./setup-tools.sh --jdk       # downloads ASM + a Temurin 21 JDK into ../tools (omit --jdk if you have JDK 21)
-cp local.env.example local.env   # set SYX_GAME_DIR (and optional install dirs)
-./test.sh                    # build, headless tests, install into your mods folder
+make setup                   # ASM (+ a Temurin 21 JDK into tools/ if you have none)
+cp syx-multiplayer/local.env.example syx-multiplayer/local.env   # set SYX_GAME_DIR (and optional install dirs)
+make test                    # build, headless tests, install into your mods folder
 ```
 
-- `./build.sh` builds and installs; `SYX_INSTALL=0 ./build.sh` only builds.
-- `./package.sh` builds the distributable zip into `dist/`.
+- `make build` builds and installs (`syx-multiplayer/build.sh`;
+  `SYX_INSTALL=0` only builds). `make package` zips into `syx-multiplayer/dist/`.
+- `make release` cuts the next patch release (see above); `BUMP=minor` /
+  `BUMP=major` / `VERSION=X.Y.Z` for other bumps, `make release-dry` to
+  rehearse. `make help` lists everything.
 - `e2e/run-pair.sh` launches a host and a joiner side by side on one PC (Linux,
   needs `xdotool`; the joiner uses the gitignored `.mp-test-home/` as its data
   dir). `e2e/watch.sh`, `difftrace.sh`, `diffdesync.sh`, `diffload.sh` analyse
   the logs. Useful JVM flags are listed in `CLAUDE.md` ("Testing workflow").
 - Machine-specific notes that must not be committed go in `CLAUDE.local.md`
   and `syx-multiplayer/local.env` (both gitignored).
-
-## CI secrets (repository admins)
-
-The game is proprietary, so CI downloads `SongsOfSyx.jar` at build time from a
-URL you provide. In the repository settings under *Secrets and variables >
-Actions* add:
-
-- `SYX_GAME_JAR_URL` (required): a direct download URL for the **V71.44**
-  `SongsOfSyx.jar` (~36 MB). Any private location works: a release asset in a
-  private GitHub repo, an object-storage pre-signed URL, a self-hosted file.
-- `SYX_GAME_JAR_TOKEN` (optional): sent as `Authorization: Bearer <token>`
-  (with `Accept: application/octet-stream`), e.g. a fine-grained GitHub token
-  that can read the private repo holding the jar. The asset URL for a private
-  GitHub release is `https://api.github.com/repos/<owner>/<repo>/releases/assets/<asset id>`.
-
-Without the secret, pull requests from forks skip the build with a warning
-(forks never receive secrets) and the push to `main` fails before releasing.
-Never commit the game jar or anything derived from it.

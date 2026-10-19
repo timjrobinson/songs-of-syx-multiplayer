@@ -161,7 +161,7 @@ synced methods, playing the role Harmony plays for RimWorld.
 ## Developing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the PR workflow and how
-releases are cut, and `CLAUDE.md` for the technical map (game internals,
+releases are cut (locally, with `make release`), and `CLAUDE.md` for the technical map (game internals,
 port design decisions, determinism rules). Deep-dive docs live in `docs/`:
 `HANDOFF4.md` is the latest session summary, `sync-coverage.md` lists every
 synced action, `sos-internals.md` and `rimworld-mp-architecture.md` are the
@@ -170,11 +170,13 @@ surveys the port is built on.
 Quick start (you need your own copy of the game):
 
 ```sh
-cd syx-multiplayer
-./setup-tools.sh --jdk              # ASM + Temurin 21 into ../tools
-cp local.env.example local.env      # set SYX_GAME_DIR
-./test.sh                           # build, headless tests, install into your mods folder
+make setup                                                       # ASM + a JDK 21 into tools/
+cp syx-multiplayer/local.env.example syx-multiplayer/local.env   # set SYX_GAME_DIR
+make test                                                        # build, headless tests, install into your mods folder
 ```
+
+`make build` builds and installs, `make release` publishes the next version
+(see CONTRIBUTING.md), `make help` lists the rest.
 
 Reference targets: Songs of Syx **V71.44** (Java 16 bytecode on the bundled
 Temurin 21 JRE); RimWorld Multiplayer **0.11.5**, wire protocol 54.
