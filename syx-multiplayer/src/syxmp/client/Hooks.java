@@ -95,6 +95,21 @@ public final class Hooks {
         // World battle prompts: record + pause when the sim opens one (WorldBattleSync).
         SyncTemplates.registerAt(PatchTable.HOOK_WBATTLE_PROMPT,
                 (self, args) -> syxmp.sync.WorldBattleSync.promptOpened(self, args));
+        // World army/region handlers (ArmySync).
+        SyncTemplates.registerAt(PatchTable.HOOK_RECRUIT, syxmp.sync.ArmySync::recruitClick);
+        SyncTemplates.registerAt(PatchTable.HOOK_MERC_HIRE, syxmp.sync.ArmySync::mercHireClick);
+        SyncTemplates.registerAt(PatchTable.HOOK_AUTONOMY, syxmp.sync.ArmySync::autonomyExe);
+        // Settlement tools with UI-local state (RoomToolSync) and map marks (NameSync).
+        SyncTemplates.registerAt(PatchTable.HOOK_HOME_ASSIGN, syxmp.sync.RoomToolSync::homeAssignPlace);
+        SyncTemplates.registerAt(PatchTable.HOOK_RACE_ASSIGN, syxmp.sync.RoomToolSync::raceAssignPlace);
+        SyncTemplates.registerAt(PatchTable.HOOK_HOME_ODD, syxmp.sync.RoomToolSync::homeOddPlace);
+        SyncTemplates.registerAt(PatchTable.HOOK_HOSPITAL_FETCH, syxmp.sync.RoomToolSync::hospitalFetchClick);
+        SyncTemplates.registerAt(PatchTable.HOOK_MOVE_AUTO, syxmp.sync.RoomToolSync::moveAutoClick);
+        SyncTemplates.registerAt(PatchTable.HOOK_MOVE_SET, syxmp.sync.RoomToolSync::moveSetPlace);
+        SyncTemplates.registerAt(PatchTable.HOOK_MOVE_REMOVE, syxmp.sync.RoomToolSync::moveRemoveClick);
+        SyncTemplates.registerAt(PatchTable.HOOK_MOVE_PASTE, syxmp.sync.RoomToolSync::movePastePlace);
+        SyncTemplates.registerAt(PatchTable.HOOK_MARK_ADD, syxmp.sync.NameSync::markPlace);
+        SyncTemplates.registerAt(PatchTable.HOOK_REFURNISH, syxmp.sync.RoomToolSync::refurnishInit);
         SyncTemplates.registerAt(PatchTable.HOOK_TOOL_MULTI_PLACE,
                 (self, args) -> syxmp.sync.ToolSync.multiPlace(self));
 

@@ -291,7 +291,10 @@ Wire protocol (packets/commands) is mirrored in `syxmp.common.Packets` /
   (PUTFIELD redirects), UiRedirects (generic containers at UI call sites),
   SyncActions (composite commands: events, deals, tribute, region buildings),
   BattleOrderSync (tactical orders by value), WorldBattleSync (world battle
-  prompts: deterministic pause + decision commands)
+  prompts: deterministic pause + decision commands), ArmySync (recruit,
+  mercenaries, create army, autonomy), NameSync (names, colours, map
+  marks), RoomToolSync (tools with UI-local state, move orders, refurnish,
+  copier/print state for TOOL commands)
 - `src/syxmp/agent/` — SyxAgent (premain), MpTransformer (ASM: entry hooks,
   call redirects, PUTFIELD redirects, <clinit> RND), PatchTable,
   AutoSyncTable (METHODS + FIELDS), SyncTemplates, AgentInstaller
@@ -306,11 +309,16 @@ Wire protocol (packets/commands) is mirrored in `syxmp.common.Packets` /
 
 ## Current status (2026-10-19, session 4)
 
-Session 4 (`docs/HANDOFF4.md`): tactical battle orders and world battle
-prompts are synced; the raid-demand pay/decline is one synced decision (the
+Session 4 (`docs/HANDOFF4.md`): tactical battle orders, world battle
+prompts and every remaining "still local" action of `docs/sync-coverage.md`
+(recruit/mercenaries/armies/autonomy, names/colours/marks, home/workplace
+assignment, move orders, hospital fetch, refurnish, room copy/saved prints)
+are synced; the raid-demand pay/decline is one synced decision (the
 session-3 tribute redirect had never linked — every CallRedirect replacement
-is now resolved by the headless suite). Version 0.3.1, protocol 7. Not yet
-play-tested by humans; the second test PC was offline (jar not shipped).
+is now resolved by the headless suite). Version 0.3.2, protocol 8. Only the
+scripted pair soak has exercised the new paths; human play-test pending.
+Remaining local by design: developer buttons, faction name, generated
+tactical battles (engage auto-resolves in MP), profile colour masks.
 
 ## Status at the end of session 3 (2026-10-18)
 

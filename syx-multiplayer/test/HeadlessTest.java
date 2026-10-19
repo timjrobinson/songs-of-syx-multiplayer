@@ -41,6 +41,7 @@ public final class HeadlessTest {
         testFieldAndUiRedirects();
         testBattleOrderHooks();
         testWorldBattleRedirects();
+        testUiStateHooks();
         testBattleOrderCodec();
         testJoinFlowOverTcp();
         System.out.println(failures == 0 ? "ALL TESTS PASSED" : failures + " FAILURES");
@@ -281,6 +282,32 @@ public final class HeadlessTest {
         check(countCallsInto(siege, "syxmp/sync/WorldBattleSync") >= 1, "BattleSiege buttons redirected");
         byte[] conq = transform("view/world/ui/battle/Conquer$7"); // close; mercy; occupy
         check(countCallsInto(conq, "syxmp/sync/WorldBattleSync") == 3, "Conquer occupy button: close + mercy + occupy redirected");
+    }
+
+    /** Session 4 "still local" handlers: every hooked class carries the guard, every redirected call site is rewritten. */
+    static void testUiStateHooks() throws Exception {
+        System.out.println("testUiStateHooks");
+        String[] hooked = {"view/world/ui/army/ArmyRecruit$3", "view/world/ui/army/UIMerenaries$4",
+                "view/world/ui/region/PlayInfo$9$1", "view/sett/ui/home/UIHomeAssign",
+                "view/sett/ui/room/priority/UIRoomRaceAssign", "view/sett/ui/home/UIHomeOdd",
+                "settlement/room/health/hospital/Gui$1", "settlement/room/infra/logistics/MoveOrderPullUI$1",
+                "settlement/room/infra/logistics/MoveOrderPullUI$Placer", "settlement/room/infra/logistics/MoveOrderPullUI$Detail$8",
+                "settlement/room/infra/logistics/MoveOrderPullUI$Paster", "view/sett/ui/right/UIMiniHotSpots$1",
+                "view/sett/ui/room/construction/UIRoomPlacer"};
+        for (String c : hooked)
+            check(countCallsInto(transform(c), "syxmp/agent/SyncTemplates") >= 1, c + " is hooked");
+        check(countCallsInto(transform("view/world/ui/army/List$Placer"), "syxmp/sync/ArmySync") == 2,
+                "List$Placer: create + openList redirected");
+        check(countCallsInto(transform("view/world/ui/army/Army$2"), "syxmp/sync/NameSync") == 2,
+                "Army$2: Str.clear + add redirected");
+        check(countCallsInto(transform("view/sett/ui/room/UIRoom$Detail$1"), "syxmp/sync/NameSync") == 2,
+                "UIRoom$Detail$1: Str.clear + add redirected");
+        int colour = 0;
+        for (int i = 1; i <= 3; i++)
+            colour += countCallsInto(transform("util/gui/misc/GColorPicker$" + i), "syxmp/sync/NameSync");
+        check(colour == 3, "GColorPicker: setRed/Green/Blue redirected (" + colour + ")");
+        check(countCallsInto(transform("view/sett/ui/right/UIMiniHotSpots$Panel$2"), "syxmp/sync/NameSync") == 1,
+                "UIMiniHotSpots: mark remove redirected");
     }
 
     /** The by-value codec for DivFormationImp / BattleOrderTask round-trips every field Locked.set copies. */

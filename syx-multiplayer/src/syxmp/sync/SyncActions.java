@@ -50,6 +50,13 @@ public final class SyncActions {
     static final byte BATTLE_ORDER = 4, BATTLE_TELEPORT = 5;
     /** Raid demand declined (closes the message everywhere). */
     static final byte TRIBUTE_DECLINE = 7;
+    /** ArmySync: recruit, mercenaries, create army, autonomy. */
+    static final byte RECRUIT = 8, MERC_HIRE = 9, ARMY_CREATE = 10, AUTONOMY = 11;
+    /** NameSync: names, colours, map marks. */
+    static final byte NAME_SET = 12, COLOR_SET = 13, MARK_ADD = 14, MARK_REMOVE = 15;
+    /** RoomToolSync: tools with UI-local state. */
+    static final byte HOME_ASSIGN = 16, RACE_ASSIGN = 17, HOME_ODD = 18, HOSPITAL_FETCH = 19,
+            MOVE_AUTO = 20, MOVE_SET = 21, MOVE_REMOVE = 22, MOVE_PASTE = 23, REFURNISH = 24;
     /** World battle prompt decisions (WorldBattleSync). */
     static final byte WORLD_BATTLE = 6;
 
@@ -108,6 +115,7 @@ public final class SyncActions {
         pendingEvent = null;
         pendingChoice = -1;
         tributeSent = false;
+        NameSync.frame();
     }
 
     private static void sendEventChoice(Event e, int k, EContext data) {
@@ -478,6 +486,10 @@ public final class SyncActions {
             case BATTLE_TELEPORT -> BattleOrderSync.executeTeleport(data);
             case WORLD_BATTLE -> WorldBattleSync.execute(data);
             case TRIBUTE_DECLINE -> executeTributeDecline(data);
+            case RECRUIT, MERC_HIRE, ARMY_CREATE, AUTONOMY -> ArmySync.execute(kind, data);
+            case NAME_SET, COLOR_SET, MARK_ADD, MARK_REMOVE -> NameSync.execute(kind, data);
+            case HOME_ASSIGN, RACE_ASSIGN, HOME_ODD, HOSPITAL_FETCH, MOVE_AUTO, MOVE_SET, MOVE_REMOVE, MOVE_PASTE, REFURNISH ->
+                RoomToolSync.execute(kind, data);
             default -> MpLog.err("unknown action kind " + kind);
         }
     }

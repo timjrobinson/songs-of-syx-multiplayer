@@ -83,22 +83,44 @@ AIModule_Prisoner, DIP, ROPINION, RD, EVENTS, NOBLES; depth 12).
    addressed to the current prompt. **Engage auto-resolves in MP** (the
    generated tactical battle is a separate saved game). Auto-resolve RND is
    consumed inside the command (reseeded).
-3. **Recruiting** (`ArmyRecruit.java:94`, composite with RND via
-   `WDivRegional.init` → `bannerSet(RND)`), **mercenaries** (`UIMerenaries:106`
-   = `ADDiv.reassign` + `FCredits.inc`, both synced individually — verify),
-   **create army** (`WArmyConstructor.create` from a placer; first-army
-   location uses `WPATHING.rnd`).
-4. **Grant autonomy** (`PlayInfo.java:244`): six-step sequence creating a
-   faction, RND inside.
-5. **Str mutations**: army/region/capital/division names (`Str.clear().add`),
-   banner colours (`ColorImp` edited in place), map marks.
-6. **Room copy with UI state**: `Copier$7.place` and `SavedPrintsPlacer$5.place`
-   read the UI-local source/print/structure/walls/swap; `UIRoomRaceAssign`,
-   `UIHomeAssign` carry a UI-local bitset; `UIHomeOdd` picks humanoids with a
-   UI iterator. The tool place goes over the wire but the local state does not.
-   `RoomPlacer.reconstruct` (refurnish) needs a custom command.
-7. Hospital `fetch[]` (array store), `RBITImp.or(RBIT.ALL)` (static arg),
-   `MoveOrderPull` array slots, `RDRaceEdict` double set is fine.
+3. ~~Recruiting / mercenaries / create army~~ — synced in session 4
+   (`ArmySync`): entry hooks on the click handlers (`ArmyRecruit$3`,
+   `UIMerenaries$4`) ship the UI editor's values / the selected cards as
+   RECRUIT / MERC_HIRE commands; `WArmyConstructor.create` inside
+   `view/world/ui/army/List*` becomes ARMY_CREATE (the first army's random
+   tile is picked on the issuer and travels as data; `openList` runs on the
+   issuer when the command executes).
+4. ~~Grant autonomy~~ — synced (`PlayInfo$9$1.exe` hook → AUTONOMY; the six
+   steps incl. RND run inside the command). Abandon was already synced
+   (`RD.setFaction` static AutoSync target).
+5. ~~Str mutations / banner colours / map marks~~ — synced (`NameSync`):
+   `Str.clear()/add()` are redirected only inside the five name-input widget
+   classes (Army$2, PlayInfo$11, UIProfile$3, UIRoom$Detail$1,
+   UIMiniHotSpots$Panel$1); the Str's owner is found by scanning player
+   armies, regions, room instances and marks → NAME_SET(kind, index, text).
+   `ColorImp.setRed/Green/Blue` inside `GColorPicker*` → COLOR_SET for
+   marks, the player banner (BG/FG/border/pole) and division banners;
+   unknown colours (profile colour masks) stay local. Marks: `UIMiniHotSpots$1
+   .placeFirst` hook → MARK_ADD (random colour inside the command),
+   `SettMark.remove` → MARK_REMOVE. The faction name itself
+   (`FACTIONS.player().name`, edited by the input sprite internally) is
+   still local — cosmetic.
+6. ~~Room copy with UI state~~ — synced (`RoomToolSync` + `ToolSync`):
+   FIXED tool commands for `Copier$7` / `SavedPrintsPlacer$5` carry the
+   source room, structure, walls flag, blueprint swap, rotation (and for
+   prints the whole SavedPrint, which lives in the player's profile, not the
+   save) and apply it before `place()`; `Copier.placeFirst` is local-only
+   (it only sets up the tool). `UIHomeAssign` / `UIRoomRaceAssign` /
+   `UIHomeOdd` (view-owned, unaddressable) are hooked per tile with their
+   bit set / entity cursor (`ToolSync.HOOKED_TOOLS` keeps them off the TOOL
+   path). Refurnish: `UIRoomPlacer.init(RoomInstanceImp)` hook → REFURNISH
+   (room removal + `RoomPlacer.reconstruct` on every client; the tool opens
+   on the issuer when the command executes).
+7. ~~Hospital `fetch[]`, `RBITImp.or(RBIT.ALL)`, move-order slots~~ —
+   synced: `hospital/Gui$1.clickA` hook → HOSPITAL_FETCH; `MoveOrderPullUI`
+   auto-assign ($1), source placer (`$Placer.placeFirst`), remove
+   (`$Detail$8`) and paste (`$Paster.place`) hooks → MOVE_*; `RBITImp.or`
+   inside `MoveOrderPullUI*` → SYNC_AUTO with a new RBIT worker.
 8. Developer-only buttons (never synced on purpose).
 
 ## Hazards found by the survey (fixed or noted)

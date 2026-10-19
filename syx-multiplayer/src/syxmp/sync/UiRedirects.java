@@ -59,4 +59,11 @@ public final class UiRedirects {
             return target.set(i, v);
         return target;
     }
+
+    /** MoveOrderPullUI: resbits.or(RBIT.ALL) — a static RBIT argument, serialized by the RBIT worker. */
+    public static init.resources.RBIT.RBITImp rbitOr(init.resources.RBIT.RBITImp target, init.resources.RBIT other) {
+        if (!AutoSync.sendRuntime(target, "or", "(Linit/resources/RBIT;)Linit/resources/RBIT$RBITImp;", other))
+            return target.or(other);
+        return target;
+    }
 }

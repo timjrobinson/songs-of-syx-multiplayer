@@ -168,6 +168,21 @@ public final class SyxSerialization {
                     return e instanceof settlement.entity.humanoid.Humanoid h ? h.indu() : null;
                 });
 
+        // Resource bit sets (RBIT.ALL etc.): one flag per resource.
+        SyncSerialization.register(init.resources.RBIT.class,
+                (w, b) -> {
+                    w.writeInt(init.resources.RESOURCES.ALL().size());
+                    for (RESOURCE res : init.resources.RESOURCES.ALL())
+                        w.writeBool(b != null && b.has(res));
+                },
+                r -> {
+                    int n = r.readInt();
+                    init.resources.RBIT.RBITImp b = new init.resources.RBIT.RBITImp();
+                    for (int i = 0; i < n; i++)
+                        if (r.readBool() && i < init.resources.RESOURCES.ALL().size())
+                            b.or(init.resources.RESOURCES.ALL().get(i));
+                    return b;
+                });
         SyncSerialization.register(RESOURCE.class,
                 (w, res) -> w.writeInt(res == null ? -1 : res.index()),
                 r -> {

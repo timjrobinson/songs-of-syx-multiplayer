@@ -45,7 +45,48 @@ public final class DevAuto {
 
     /** Scripted player actions, issued from UI context so they go through the sync hooks. */
     private static void act(int i) {
-        switch (i % 5) {
+        switch (i % 8) {
+            case 7 -> {
+                // Home assignment with a UI-local bit set (RoomToolSync): everyone allowed in the first house.
+                settlement.room.home.house.HomeInstance h = null;
+                for (settlement.room.main.RoomBlueprintIns<?> b : settlement.main.SETT.ROOMS().ins())
+                    if (b.instancesSize() > 0 && ((Object) b.getInstance(0)) instanceof settlement.room.home.house.HomeInstance hi) {
+                        h = hi;
+                        break;
+                    }
+                if (h == null) {
+                    MpLog.info("[auto] action: no house for home assignment");
+                    return;
+                }
+                MpLog.info("[auto] action: home assignment on house at " + h.mX() + "," + h.mY());
+                syxmp.net.ByteWriter w = new syxmp.net.ByteWriter(64);
+                w.writeByte(16); // SyncActions.HOME_ASSIGN
+                w.writeInt(h.mX());
+                w.writeInt(h.mY());
+                w.writeInt(0); // empty bits = nobody; harmless, exercises the path
+                ClientCommands.send(syxmp.common.CommandType.ACTION, w);
+            }
+            case 6 -> {
+                // Map mark at the map centre (NameSync): random colour drawn inside the command.
+                int cx = settlement.main.SETT.TWIDTH / 2, cy = settlement.main.SETT.THEIGHT / 2;
+                MpLog.info("[auto] action: map mark at " + cx + "," + cy);
+                syxmp.sync.NameSync.markPlace(null, new Object[] {cx, cy});
+            }
+            case 5 -> {
+                // Rename the first room through the Str redirect pair (NameSync.ownerOf scan + NAME_SET).
+                settlement.room.main.RoomInstance room = null;
+                for (settlement.room.main.RoomBlueprintIns<?> b : settlement.main.SETT.ROOMS().ins())
+                    if (b.instancesSize() > 0) {
+                        room = b.getInstance(0);
+                        break;
+                    }
+                if (room == null) {
+                    MpLog.info("[auto] action: no room to rename");
+                    return;
+                }
+                MpLog.info("[auto] action: rename room #" + room.index());
+                syxmp.sync.NameSync.strAdd(syxmp.sync.NameSync.strClear(room.name()), "MP room " + i);
+            }
             case 4 -> {
                 // Tactical battle orders on the first player division (BattleOrderSync): a STOP task and a
                 // re-set of its current destination formation go through the Locked.set hook.

@@ -61,6 +61,23 @@ public final class PatchTable {
     public static final int HOOK_ARMIES_TELEPORT = 23;
     /** UIWBattlePrompt.* entry: records the pending world-battle prompt, pauses the clock (WorldBattleSync). */
     public static final int HOOK_WBATTLE_PROMPT = 24;
+    /** World army/region click handlers with UI-local editors (ArmySync). */
+    public static final int HOOK_RECRUIT = 25;
+    public static final int HOOK_MERC_HIRE = 26;
+    public static final int HOOK_AUTONOMY = 27;
+    /** Settlement tools / buttons with UI-local state (RoomToolSync). */
+    public static final int HOOK_HOME_ASSIGN = 28;
+    public static final int HOOK_RACE_ASSIGN = 29;
+    public static final int HOOK_HOME_ODD = 30;
+    public static final int HOOK_HOSPITAL_FETCH = 31;
+    public static final int HOOK_MOVE_AUTO = 32;
+    public static final int HOOK_MOVE_SET = 33;
+    public static final int HOOK_MOVE_REMOVE = 34;
+    public static final int HOOK_MOVE_PASTE = 35;
+    /** Map mark placement (NameSync): random colour inside the command. */
+    public static final int HOOK_MARK_ADD = 36;
+    /** UIRoomPlacer.init(RoomInstanceImp): refurnish removes the room and re-stages the shared placer. */
+    public static final int HOOK_REFURNISH = 37;
 
     // Sync-method hooks (bound to SyncMethod handlers by SyxSync) start at 100.
     public static final int HOOK_IMMIGRATION_ADMIT = 100;
@@ -350,6 +367,53 @@ public final class PatchTable {
         t.redirects.add(new CallRedirect(wbUi, null, "util/data/DOUBLE_O$DOUBLE_OE", "incD",
                 "(Ljava/lang/Object;D)Lutil/data/DOUBLE_O$DOUBLE_OE;", wbs, "mercyInc"));
         t.redirects.add(new CallRedirect(wbUi, null, "snake2d/util/misc/ACTION", "exe", "()V", wbs, "close"));
+
+        // World army / region handlers with UI-local editors (ArmySync).
+        t.hooks.add(new EntryHook("view/world/ui/army/ArmyRecruit$3", "clickA", "()V", HOOK_RECRUIT));
+        t.hooks.add(new EntryHook("view/world/ui/army/UIMerenaries$4", "clickA", "()V", HOOK_MERC_HIRE));
+        t.hooks.add(new EntryHook("view/world/ui/region/PlayInfo$9$1", "exe", "()V", HOOK_AUTONOMY));
+        t.redirects.add(new CallRedirect("view/world/ui/army/List*", null,
+                "world/entity/army/WArmyConstructor", "create", "(IILgame/faction/Faction;)Lworld/entity/army/WArmy;",
+                "syxmp/sync/ArmySync", "armyCreate"));
+        t.redirects.add(new CallRedirect("view/world/ui/army/List*", null,
+                "view/world/ui/army/UIArmies", "openList", "(Lworld/entity/army/WArmy;)V",
+                "syxmp/sync/ArmySync", "openList"));
+
+        // Names typed into sim-owned Str objects (NameSync): the exact input
+        // widget classes — Army$2 army name, PlayInfo$11 region name,
+        // UIProfile$3 capital name, UIRoom$Detail$1 room name,
+        // UIMiniHotSpots$Panel$1 map mark name.
+        String strOwner = "snake2d/util/sprite/text/Str";
+        for (String ui : new String[] {"view/world/ui/army/Army$2", "view/world/ui/region/PlayInfo$11",
+                "view/ui/profile/UIProfile$3", "view/sett/ui/room/UIRoom$Detail$1", "view/sett/ui/right/UIMiniHotSpots$Panel$1"}) {
+            t.redirects.add(new CallRedirect(ui, null, strOwner, "clear", "()L" + strOwner + ";", "syxmp/sync/NameSync", "strClear"));
+            t.redirects.add(new CallRedirect(ui, null, strOwner, "add", "(Ljava/lang/CharSequence;)L" + strOwner + ";",
+                    "syxmp/sync/NameSync", "strAdd"));
+        }
+        // Colour pickers editing sim colours in place (marks, faction banner, division banners).
+        for (String m : new String[] {"setRed", "setGreen", "setBlue"})
+            t.redirects.add(new CallRedirect("util/gui/misc/GColorPicker*", null,
+                    "snake2d/util/color/ColorImp", m, "(I)Lsnake2d/util/color/ColorImp;", "syxmp/sync/NameSync", m));
+        // Map marks: placement (random colour) and removal.
+        t.hooks.add(new EntryHook("view/sett/ui/right/UIMiniHotSpots$1", "placeFirst", "(II)V", HOOK_MARK_ADD));
+        t.redirects.add(new CallRedirect("view/sett/ui/right/UIMiniHotSpots$Panel*", null,
+                "settlement/tilemap/SettMarks$SettMark", "remove", "()V", "syxmp/sync/NameSync", "markRemove"));
+
+        // Settlement tools with UI-local state (RoomToolSync); ToolSync.HOOKED_TOOLS keeps them off the TOOL path.
+        String multiPlace = "(IILsnake2d/util/datatypes/AREA;Lview/tool/PLACER_TYPE;)V";
+        t.hooks.add(new EntryHook("view/sett/ui/home/UIHomeAssign", "place", multiPlace, HOOK_HOME_ASSIGN));
+        t.hooks.add(new EntryHook("view/sett/ui/room/priority/UIRoomRaceAssign", "place", multiPlace, HOOK_RACE_ASSIGN));
+        t.hooks.add(new EntryHook("view/sett/ui/home/UIHomeOdd", "place", multiPlace, HOOK_HOME_ODD));
+        t.hooks.add(new EntryHook("settlement/room/health/hospital/Gui$1", "clickA", "()V", HOOK_HOSPITAL_FETCH));
+        String mop = "settlement/room/infra/logistics/MoveOrderPullUI";
+        t.hooks.add(new EntryHook(mop + "$1", "clickA", "()V", HOOK_MOVE_AUTO));
+        t.hooks.add(new EntryHook(mop + "$Placer", "placeFirst", "(II)V", HOOK_MOVE_SET));
+        t.hooks.add(new EntryHook(mop + "$Detail$8", "clickA", "()V", HOOK_MOVE_REMOVE));
+        t.hooks.add(new EntryHook(mop + "$Paster", "place", multiPlace, HOOK_MOVE_PASTE));
+        t.hooks.add(new EntryHook("view/sett/ui/room/construction/UIRoomPlacer", "init",
+                "(Lsettlement/room/main/Room$RoomInstanceImp;)V", HOOK_REFURNISH));
+        t.redirects.add(new CallRedirect(mop + "*", null, "init/resources/RBIT$RBITImp", "or",
+                "(Linit/resources/RBIT;)Linit/resources/RBIT$RBITImp;", "syxmp/sync/UiRedirects", "rbitOr"));
 
         // Direct field assignments from UI code (AutoSyncTable.FIELDS).
         for (String[] f : AutoSyncTable.FIELDS)

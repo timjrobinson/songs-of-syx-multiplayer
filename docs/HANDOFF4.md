@@ -66,15 +66,56 @@ state. Version 0.3.1, protocol 7 (ACTION payload gained kinds 4-7).
   TRIBUTE_DECLINE (iteration) marking `declined` and closing the message.
   Second decisions are rejected by `RaidingCurrent.canPay(iteration)`.
 
+### "Finish ALL still-local actions" (second half of the session)
+Version 0.3.2, protocol 8 (ACTION kinds 8-24, TOOL FIXED payload carries a
+state blob). `docs/sync-coverage.md` items 3-7 are now synced:
+- `sync/ArmySync`: recruit (`ArmyRecruit$3.clickA` hook: UI editor values →
+  RECRUIT, body replayed incl. supply withdrawal), mercenaries
+  (`UIMerenaries$4.clickA` → MERC_HIRE with the selected card indices),
+  create army (`WArmyConstructor.create` redirect in `List*` → ARMY_CREATE;
+  `openList` redirect swallows the null and the issuer opens the list when
+  the command executes), autonomy (`PlayInfo$9$1.exe` → AUTONOMY, six steps
+  inside the command).
+- `sync/NameSync`: `Str.clear()/add()` redirected only in the five name
+  input widget classes, owner found by scanning armies/regions/rooms/marks
+  → NAME_SET; `ColorImp.setRed/Green/Blue` in `GColorPicker*` → COLOR_SET
+  (marks, player banner, division banners; the minimap realm colour is
+  refreshed like UIFactionBanner.change does); map marks MARK_ADD (hook on
+  `UIMiniHotSpots$1.placeFirst`; random colour inside the command) and
+  MARK_REMOVE. The faction name Str (edited inside StringInputSprite) stays
+  local — cosmetic.
+- `sync/RoomToolSync`: per-tile hooks for `UIHomeAssign`, `UIRoomRaceAssign`
+  (both carry their `HTypeBitsImp.data`; HGROUP and WGROUP variants share
+  the layout), `UIHomeOdd` (entity cursor shipped, written back on the
+  issuer); `hospital/Gui$1` fetch toggle; move orders (auto-assign flood,
+  source placer, remove, paste — hooks on `MoveOrderPullUI$1/$Placer/
+  $Detail$8/$Paster`), `RBITImp.or(RBIT.ALL)` via a new RBIT serialization
+  worker; refurnish (`UIRoomPlacer.init(RoomInstanceImp)` hook →
+  REFURNISH); copier / saved-print state: `ToolSync` FIXED commands now
+  carry `RoomToolSync.captureState()` (source room, structure, walls,
+  blueprint swap, rotation; for prints the whole SavedPrint since prints
+  live in the player profile) applied before `place()`. `ToolSync.
+  HOOKED_TOOLS` keeps the hooked tools off the TOOL path (they were
+  unaddressable view objects → "UNSYNCED tool" before); `Copier.placeFirst`
+  is local-only (it only sets up the tool and activated it on every client).
+- Headless: `testUiStateHooks` checks all 13 hooked classes and the
+  redirected call sites; the redirect-resolution test covers the new
+  replacements. DevAuto actions 5-7 (rename room, map mark, home
+  assignment) run in the pair soak.
+- Still local, by design: developer buttons; the faction name; generated
+  tactical battles (engage auto-resolves); profile colour masks (ColorPop,
+  local profile data).
+
 ## Not done / open
 
 1. Human play-test of everything above (battle orders, a world battle, a
    raid demand with both players clicking).
-2. Still-local actions, now from item 3 of `docs/sync-coverage.md`:
-   recruiting / mercenaries / create army, grant autonomy, Str renames,
-   room copy with UI state, hospital/MoveOrderPull array slots.
+2. Human play-test of the second-half items (recruit, mercenaries, create
+   army, autonomy, renames, colours, marks, home/workplace assignment,
+   oddjobber mover, hospital fetch, move orders, refurnish, room copy, saved
+   prints). Most could only be exercised by hooks/redirect tests; grep both
+   logs for `UNSYNCED|error executing|gone|ignored` after a session.
 3. Generated tactical battles ("engage") — design pass (above).
-4. the second test PC was unreachable (ssh timeout); the jar must be shipped per
-   CLAUDE.md "Working agreements". Both games must be restarted after any
-   install (the running pair keeps the old jar mapped).
+4. the second test PC received 0.3.1 and 0.3.2 (scp + mv); both games must be
+   restarted after any install (a running game keeps the old jar mapped).
 5. H3 items 3 (paused-step unsaved state), 4 (Steam) unchanged.

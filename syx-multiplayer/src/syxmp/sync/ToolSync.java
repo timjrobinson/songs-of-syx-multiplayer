@@ -37,6 +37,22 @@ public final class ToolSync {
 
     private static Field fPlacable, fArea, fType;
 
+    /**
+     * Tools whose per-tile effect is shipped by an entry hook with the UI
+     * state it needs (RoomToolSync/NameSync); the tool itself must never go
+     * over the wire (unaddressable, or addressable but with local state).
+     */
+    private static final java.util.Set<String> HOOKED_TOOLS = java.util.Set.of(
+            "view.sett.ui.home.UIHomeAssign", "view.sett.ui.room.priority.UIRoomRaceAssign",
+            "view.sett.ui.home.UIHomeOdd", "settlement.room.infra.logistics.MoveOrderPullUI$Paster",
+            "settlement.room.infra.logistics.MoveOrderPullUI$Placer", "view.sett.ui.right.UIMiniHotSpots$1");
+    /** placeFirst only sets up local tool state (Copier.java:214: source room, structure, swap, then activates the fixed step). */
+    private static final java.util.Set<String> LOCAL_FIRST = java.util.Set.of("settlement.room.main.copy.Copier");
+
+    private static boolean hooked(Object placable) {
+        return HOOKED_TOOLS.contains(placable.getClass().getName());
+    }
+
     private ToolSync() {
     }
 
@@ -53,6 +69,8 @@ public final class ToolSync {
                 fType = ReflectUtil.field(tool.getClass(), "type");
             }
             PlacableMulti placable = ReflectUtil.get(fPlacable, tool);
+            if (hooked(placable))
+                return false; // vanilla loop; each place(x, y) is hooked
             AREA area = ReflectUtil.get(fArea, tool);
             PLACER_TYPE type = ReflectUtil.get(fType, tool);
             String path = ObjectPaths.pathOf(placable);
@@ -139,6 +157,10 @@ public final class ToolSync {
     private static boolean trySend(int kind, Object placable, int a, int b, int c, int d) {
         if (!Multiplayer.shouldSync())
             return false;
+        if (hooked(placable))
+            return false;
+        if ((kind == FIRST || kind == EXPANDED) && LOCAL_FIRST.contains(placable.getClass().getName()))
+            return false;
         String path = ObjectPaths.pathOf(placable);
         if (path == null) {
             unsynced(placable);
@@ -152,6 +174,8 @@ public final class ToolSync {
         w.writeInt(b);
         w.writeInt(c);
         w.writeInt(d);
+        // Fixed placers with UI-local state (room copier, saved prints) carry it along.
+        w.writeBytes(kind == FIXED ? RoomToolSync.captureState(placable) : new byte[0]);
         send(w);
         return true;
     }
@@ -202,6 +226,9 @@ public final class ToolSync {
             }
             Job.overwrite = data.readBool();
             int a = data.readInt(), b = data.readInt(), c = data.readInt(), d = data.readInt();
+            byte[] state = data.readBytes();
+            if (kind == FIXED)
+                RoomToolSync.applyState(placable, state);
             switch (kind) {
                 case SIMPLE -> ((PlacableSimple) placable).place(a, b);
                 case SIMPLE_TILE -> ((PlacableSimpleTile) placable).place(a, b);
