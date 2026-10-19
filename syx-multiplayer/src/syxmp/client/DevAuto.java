@@ -50,6 +50,10 @@ public final class DevAuto {
      *  items, door undo, construct), then requests state hashes — the second two-PC desync's sequence. */
     private static final String AUTOBUILD = System.getProperty("syxmp.autobuild");
     private static int buildFrames, buildStep, bX, bY;
+    /** -Dsyxmp.autostock=1: the host allocates one more crate and one more worker on the first stockpile
+     *  through the hooked setters; every client logs the stockpile's state before and after. */
+    private static final String AUTOSTOCK = System.getProperty("syxmp.autostock");
+    private static int stockFrames, stockStep;
     /** -Dsyxmp.autocamera=x,y: centre this client's camera on that tile once in lockstep (host or joiner);
      *  the builder script also centres the joiner on its lodge. Real players look at different places. */
     private static final String AUTOCAMERA = System.getProperty("syxmp.autocamera");
@@ -245,6 +249,39 @@ public final class DevAuto {
             }
         } else {
             framesWithTwo = 0;
+        }
+
+        if (AUTOSTOCK != null && stockStep < 3 && Multiplayer.active() && TickController.inLockstep()
+                && TickController.simulatingTarget < 0 && !Multiplayer.reloading
+                && Multiplayer.session.players.size() >= 2 && ++stockFrames % 120 == 0) {
+            try {
+                settlement.room.infra.stockpile.StockpileInstance s = null;
+                for (int k = 0; k < settlement.main.SETT.ROOMS().STOCKPILE.instancesSize() && s == null; k++)
+                    s = settlement.main.SETT.ROOMS().STOCKPILE.getInstance(k);
+                if (s == null) {
+                    MpLog.info("[auto] stock: no stockpile");
+                    stockStep = 3;
+                    return;
+                }
+                init.resources.RESOURCE res = init.resources.RESOURCES.ALL().get(0);
+                int crates = settlement.main.SETT.ROOMS().STOCKPILE.tally().crates.get(res, s);
+                MpLog.info("[auto] stock #" + s.index() + " step " + stockStep + ": crates(" + res.key + ")=" + crates
+                        + " needed=" + s.employees().needed() + " max=" + s.employees().max()
+                        + " employed=" + s.employees().employed());
+                if (Multiplayer.session.isHost && stockStep == 1) {
+                    MpLog.info("[auto] stock: allocateCrate(" + res.key + ", " + (crates + 1) + ") + neededSet("
+                            + (s.employees().needed() + 1) + ")");
+                    java.lang.reflect.Method m = s.getClass().getDeclaredMethod("allocateCrate",
+                            init.resources.RESOURCE.class, int.class);
+                    m.setAccessible(true);
+                    m.invoke(s, res, crates + 1);
+                    s.employees().neededSet(s.employees().needed() + 1);
+                }
+                stockStep++;
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                MpLog.err("[auto] stock failed", e);
+                stockStep = 3;
+            }
         }
 
         if (AUTOCAMERA != null && !cameraDone && Multiplayer.active() && TickController.inLockstep()

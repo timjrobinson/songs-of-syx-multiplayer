@@ -464,6 +464,11 @@ public final class PatchTable {
                 "settlement/room/main/placement/RoomPlacer$AutoWalls", "set", "(Z)Lutil/data/BOOLEAN$BOOLEAN_MUTABLE;",
                 "syxmp/sync/UiRedirects", "autoWallsLocal"));
 
+        // Auto employment on/off per room (ModuleEmployment): the blueprint's per-instance flag, read by the sim.
+        t.redirects.add(new CallRedirect("view/sett/ui/room/ModuleEmployment*", null,
+                "settlement/room/main/job/ROOM_EMPLOY_AUTO", "autoEmploy", "(Lsettlement/room/main/Room;Z)V",
+                "syxmp/sync/UiRedirects", "autoEmploy"));
+
         // The deal proposal message's accept / decline buttons: one command each (SyncActions).
         t.hooks.add(new EntryHook("view/ui/diplomacy/UIDipMessDeal$3", "clickA", "()V", HOOK_DEAL_ACCEPT));
         t.hooks.add(new EntryHook("view/ui/diplomacy/UIDipMessDeal$4", "clickA", "()V", HOOK_DEAL_DECLINE));

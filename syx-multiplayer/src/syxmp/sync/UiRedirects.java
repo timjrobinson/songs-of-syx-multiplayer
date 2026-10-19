@@ -18,6 +18,14 @@ public final class UiRedirects {
     private UiRedirects() {
     }
 
+    /** The employment panel's Auto on/off (ModuleEmployment.java:251-262): a per-instance flag on the
+     *  blueprint (ROOM_STOCKPILE.autoEmploy(Room, boolean) -> StockpileInstance.autoE) that the sim's
+     *  employment update reads (RoomInstance.java:133). Synced as a runtime-class setter. */
+    public static void autoEmploy(settlement.room.main.job.ROOM_EMPLOY_AUTO bp, settlement.room.main.Room r, boolean b) {
+        if (!AutoSync.sendRuntime(bp, "autoEmploy", "(Lsettlement/room/main/Room;Z)V", r, b))
+            bp.autoEmploy(r, b);
+    }
+
     private static final String PLANNING_INSTANCE = "settlement.room.main.placement.Instance";
 
     /** Another player's room plan: the shared placer's tiles sit in the room map on every client. */
