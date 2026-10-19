@@ -110,6 +110,8 @@ public final class Hooks {
         SyncTemplates.registerAt(PatchTable.HOOK_MOVE_PASTE, syxmp.sync.RoomToolSync::movePastePlace);
         SyncTemplates.registerAt(PatchTable.HOOK_MARK_ADD, syxmp.sync.NameSync::markPlace);
         SyncTemplates.registerAt(PatchTable.HOOK_REFURNISH, syxmp.sync.RoomToolSync::refurnishInit);
+        SyncTemplates.registerAt(PatchTable.HOOK_DEAL_ACCEPT, syxmp.sync.SyncActions::dealAcceptClick);
+        SyncTemplates.registerAt(PatchTable.HOOK_DEAL_DECLINE, syxmp.sync.SyncActions::dealDeclineClick);
         // Generated battles (GenBattleSync) and in-session vanilla loads.
         SyncTemplates.registerAt(PatchTable.HOOK_GAME_LOADER_SET, (self, args) -> {
             if (Multiplayer.active() && Multiplayer.executingCmds && TickController.inLockstep()) {

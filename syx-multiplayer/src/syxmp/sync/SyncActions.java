@@ -61,6 +61,8 @@ public final class SyncActions {
     static final byte GEN_BATTLE = 25;
     /** World battle prompt decisions (WorldBattleSync). */
     static final byte WORLD_BATTLE = 6;
+    /** Deal proposal message accepted / declined (UIDipMessDeal buttons). */
+    static final byte DEAL_ACCEPT = 26, DEAL_DECLINE = 27;
 
     private SyncActions() {
     }
@@ -254,6 +256,99 @@ public final class SyncActions {
             return;
         }
         d.execute(changeOpinion);
+    }
+
+    // =========================================================================
+    // Deal proposal message (view/ui/diplomacy/UIDipMessDeal.java:125 accept, :163 decline)
+    //
+    // Accept: DIP.TMP() <- save; execute(false); request.clear(); GIFTS.makeDeal(npc, happiness);
+    // aa = 1; messages.hide(). Decline: aa = -1; request.expire(); hide(). The sim part is one
+    // command carrying the message's DealSave; every client then marks its own copy of the message
+    // (same faction and creation second: the sim creates it on all clients in the same tick) and
+    // closes it if it is on screen. Without this the other players' copies stayed open — and kept
+    // rewriting DIP.TMP() every frame (pactive(), :202).
+    // =========================================================================
+
+    private static final String DEAL_MESS = "view.ui.diplomacy.UIDipMessDeal";
+
+    /** Entry hook of UIDipMessDeal$3.clickA (accept). */
+    public static boolean dealAcceptClick(Object self, Object[] args) {
+        return dealDecision(self, DEAL_ACCEPT);
+    }
+
+    /** Entry hook of UIDipMessDeal$4.clickA (decline). */
+    public static boolean dealDeclineClick(Object self, Object[] args) {
+        return dealDecision(self, DEAL_DECLINE);
+    }
+
+    private static boolean dealDecision(Object button, byte kind) {
+        if (!Multiplayer.shouldSync())
+            return false;
+        try {
+            Object mess = ReflectUtil.field(button.getClass(), "this$0").get(button);
+            if (ReflectUtil.field(mess.getClass(), "aa").getByte(mess) != 0)
+                return true; // already decided: vanilla would return too (pactive() != null)
+            DealSave save = (DealSave) ReflectUtil.field(mess.getClass(), "save").get(mess);
+            if (save.f() == null)
+                return false;
+            ByteWriter w = new ByteWriter(512);
+            w.writeByte(kind);
+            w.writeInt(save.f().index());
+            w.writeDouble(ReflectUtil.field(mess.getClass(), "time").getDouble(mess));
+            w.writeDouble(ReflectUtil.field(mess.getClass(), "happiness").getDouble(mess));
+            w.writeBytes(serialize(save));
+            ClientCommands.send(CommandType.ACTION, w);
+            MpLog.debug("synced deal " + (kind == DEAL_ACCEPT ? "accept" : "decline") + " from " + save.f().name);
+            return true;
+        } catch (Exception e) {
+            MpLog.err("UNSYNCED (local only): deal message — " + e);
+            return false;
+        }
+    }
+
+    private static void executeDealDecision(byte kind, ByteReader r) throws Exception {
+        int factionI = r.readInt();
+        double time = r.readDouble();
+        double happiness = r.readDouble();
+        DealSave save = (DealSave) deserialize(r.readBytes());
+        game.faction.npc.FactionNPC f = save.f();
+        if (f == null) {
+            MpLog.err("deal decision: faction " + factionI + " gone");
+            return;
+        }
+        if (kind == DEAL_ACCEPT) {
+            Deal d = DIP.TMP();
+            CharSequence problem = save.set(d);
+            if (problem != null) {
+                MpLog.err("deal not executable here: " + problem);
+            } else {
+                d.execute(false);
+                f.request.clear();
+                game.faction.royalty.opinion.ROPINION.GIFTS().makeDeal(d.npc.npc(), happiness);
+            }
+        } else {
+            f.request.expire();
+        }
+        markDealMessage(factionI, time, kind == DEAL_ACCEPT ? (byte) 1 : (byte) -1);
+    }
+
+    /** Marks this client's copy of the proposal message decided and closes it if it is on screen. */
+    private static void markDealMessage(int factionI, double time, byte aa) throws ReflectiveOperationException {
+        for (Object mess : messages()) {
+            if (!mess.getClass().getName().equals(DEAL_MESS))
+                continue;
+            DealSave ms = (DealSave) ReflectUtil.field(mess.getClass(), "save").get(mess);
+            if (ms.f() == null || ms.f().index() != factionI
+                    || ReflectUtil.field(mess.getClass(), "time").getDouble(mess) != time)
+                continue;
+            ReflectUtil.field(mess.getClass(), "aa").setByte(mess, aa);
+            view.ui.message.Messages msgs = view.main.VIEW.messages();
+            Object shown = shownMessage(msgs);
+            if (shown == mess || (shown == null && msgs.activated()))
+                msgs.hide();
+            return;
+        }
+        MpLog.info("deal proposal message (faction " + factionI + ") not found on this client");
     }
 
     // =========================================================================
@@ -488,6 +583,7 @@ public final class SyncActions {
             case BATTLE_TELEPORT -> BattleOrderSync.executeTeleport(data);
             case WORLD_BATTLE -> WorldBattleSync.execute(data);
             case TRIBUTE_DECLINE -> executeTributeDecline(data);
+            case DEAL_ACCEPT, DEAL_DECLINE -> executeDealDecision((byte) kind, data);
             case RECRUIT, MERC_HIRE, ARMY_CREATE, AUTONOMY -> ArmySync.execute(kind, data);
             case NAME_SET, COLOR_SET, MARK_ADD, MARK_REMOVE -> NameSync.execute(kind, data);
             case HOME_ASSIGN, RACE_ASSIGN, HOME_ODD, HOSPITAL_FETCH, MOVE_AUTO, MOVE_SET, MOVE_REMOVE, MOVE_PASTE, REFURNISH ->

@@ -412,12 +412,17 @@ public final class RoomToolSync {
         uiPlacer = self;
         ByteWriter w = begin(SyncActions.REFURNISH);
         SyncSerialization.write(w, Room.class, ins);
+        // The issuer's wall material: each client's placer starts with its own profile default
+        // (PLACEMENT.java:62 reads ROOM_CONSTRUCTION.STRUCTURE); reconstruct overrides it with the
+        // room's actual building when there is one.
+        w.writeInt(buildingIndex(SETT.ROOMS().placement.placer.structure.get()));
         send(w, "refurnish of room #" + ins.index());
         return true;
     }
 
     static void executeRefurnish(ByteReader r) throws ReflectiveOperationException {
         Object o = SyncSerialization.read(r, Room.class);
+        TBuilding structure = building(r.readInt());
         if (!(o instanceof settlement.room.main.Room.RoomInstanceImp ins))
             return;
         RoomBlueprintImp b = ins.constructor().blue();
@@ -432,12 +437,31 @@ public final class RoomToolSync {
             a.clear();
             return;
         }
+        if (structure != null)
+            SETT.ROOMS().placement.placer.structure.set(structure);
         SETT.ROOMS().placement.placer.reconstruct(a, up, deg, stat, b);
+        refreshPlacer(SETT.ROOMS().placement.placer);
         if (CommandExecutor.currentCmdIssuedBySelf && uiPlacer != null) {
             Object state = field(uiPlacer, "state");
             ReflectUtil.method(state.getClass(), "init", RoomBlueprintImp.class, boolean.class).invoke(state, b, true);
             view.tool.ToolConfig config = (view.tool.ToolConfig) field(state, "config");
             VIEW.s().tools.place(SETT.ROOMS().placement.placer.area(), config);
+        }
+    }
+
+    /**
+     * The placer's item/resource statistics are a cache keyed on updateI that only the accessors
+     * refresh (UtilStats.update, UtilStats.java:81) — on the issuer the open construction panel
+     * refreshes them every frame, on the other clients nobody does, yet the synced verbs read them
+     * (removeAllItems reads the raw count, RoomPlacer.java:448; createProblem reads the groups).
+     * Recomputing from the map right before every placer verb makes all clients read the same values.
+     */
+    public static void refreshPlacer(settlement.room.main.placement.RoomPlacer placer) {
+        try {
+            Object stats = ReflectUtil.field(placer.getClass(), "resources").get(placer);
+            ReflectUtil.method(stats.getClass(), "updatee").invoke(stats);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            MpLog.err("cannot refresh placer stats", e);
         }
     }
 
@@ -467,30 +491,60 @@ public final class RoomToolSync {
         ReflectUtil.method(swap.getClass(), "init", RoomBlueprintImp.class).invoke(swap, b);
     }
 
-    /** @return the state bytes a FIXED tool command must carry for this placable, or empty. */
+    private static final String ITEM_SINGLE = "settlement.room.main.placement.PlacerItemSingle";
+    private static final String ITEM_AREA = "settlement.room.main.placement.PlacerItemArea";
+    private static final byte ST_NONE = 0, ST_COPIER = 1, ST_PRINT = 2, ST_ITEM = 3;
+
+    private static Object fieldUp(Object o, String name) throws ReflectiveOperationException {
+        for (Class<?> c = o.getClass(); c != null; c = c.getSuperclass()) {
+            try {
+                Field f = c.getDeclaredField(name);
+                f.setAccessible(true);
+                return f.get(o);
+            } catch (NoSuchFieldException e) {
+                // look in the superclass
+            }
+        }
+        throw new NoSuchFieldException(name);
+    }
+
+    /**
+     * The state bytes a FIXED tool command carries: every PlacableFixed's rotation and size (the tool's
+     * rotate/size buttons set them on the issuer only, PlacableFixedTool.java:36-84), then a kind byte
+     * and the placer-specific UI state — the room copier's source/structure/swap, the saved print, or
+     * for the shared room placer's item placers the item group RoomPlacer.item(int) selected on the
+     * issuer (SItems.java:193, UIRoomPlacer.java:62-90; PlacerItemSingle.place reads group/size/rot).
+     */
     public static byte[] captureState(Object placable) {
         String cls = placable.getClass().getName();
+        ByteWriter w = new ByteWriter(64);
+        PlacableFixed fixed = (PlacableFixed) placable;
+        w.writeInt(fixed.rot());
+        w.writeInt(fixed.size());
         try {
             if (cls.equals(COPIER)) {
                 Object copier = field(placable, "this$0");
                 settlement.room.main.ROOMA room = (settlement.room.main.ROOMA) field(copier, "room");
-                if (room == null)
-                    return new byte[0];
-                ByteWriter w = new ByteWriter(32);
+                if (room == null) {
+                    w.writeByte(ST_NONE);
+                    return w.toArray();
+                }
+                w.writeByte(ST_COPIER);
                 w.writeInt(room.mX());
                 w.writeInt(room.mY());
                 w.writeInt(buildingIndex((TBuilding) field(copier, "structure")));
                 w.writeBool(ReflectUtil.field(copier.getClass(), "w").getBoolean(copier));
                 SyncSerialization.write(w, RoomBlueprintImp.class, swapCurrent(field(copier, "swap")));
-                w.writeInt(((PlacableFixed) placable).rot());
                 return w.toArray();
             }
             if (cls.equals(PRINT)) {
                 Object placer = field(placable, "this$0");
                 Object print = field(placer, "print");
-                if (print == null)
-                    return new byte[0];
-                ByteWriter w = new ByteWriter(512);
+                if (print == null) {
+                    w.writeByte(ST_NONE);
+                    return w.toArray();
+                }
+                w.writeByte(ST_PRINT);
                 w.writeString(String.valueOf(field(print, "name")));
                 SyncSerialization.write(w, RoomBlueprintImp.class, (RoomBlueprintImp) field(print, "blue"));
                 w.writeString(String.valueOf(field(print, "check")));
@@ -503,13 +557,20 @@ public final class RoomToolSync {
                 w.writeBool(ReflectUtil.field(placer.getClass(), "w").getBoolean(placer));
                 SyncSerialization.write(w, RoomBlueprintImp.class, swapCurrent(field(placer, "swap")));
                 w.writeInt(buildingIndex(SETT.ROOMS().placement.placer.structure.get()));
-                w.writeInt(((PlacableFixed) placable).rot());
+                return w.toArray();
+            }
+            if (cls.equals(ITEM_SINGLE) || cls.equals(ITEM_AREA)) {
+                settlement.room.main.furnisher.FurnisherItemGroup group =
+                        (settlement.room.main.furnisher.FurnisherItemGroup) fieldUp(placable, "group");
+                w.writeByte(ST_ITEM);
+                w.writeInt(group == null ? -1 : group.index());
                 return w.toArray();
             }
         } catch (Exception e) {
             MpLog.err("cannot capture tool state of " + cls, e);
         }
-        return new byte[0];
+        w.writeByte(ST_NONE);
+        return w.toArray();
     }
 
     public static void applyState(Object placable, byte[] state) {
@@ -518,7 +579,10 @@ public final class RoomToolSync {
         String cls = placable.getClass().getName();
         ByteReader r = new ByteReader(state);
         try {
-            if (cls.equals(COPIER)) {
+            PlacableFixed fixed = (PlacableFixed) placable;
+            int rot = r.readInt(), size = r.readInt();
+            byte kind = (byte) r.readByte();
+            if (kind == ST_COPIER) {
                 Object copier = field(placable, "this$0");
                 int mx = r.readInt(), my = r.readInt();
                 Room src = SETT.ROOMS().map.get(mx, my);
@@ -529,8 +593,7 @@ public final class RoomToolSync {
                 ReflectUtil.field(copier.getClass(), "structure").set(copier, building(r.readInt()));
                 ReflectUtil.field(copier.getClass(), "w").setBoolean(copier, r.readBool());
                 swapInit(field(copier, "swap"), (RoomBlueprintImp) SyncSerialization.read(r, RoomBlueprintImp.class));
-                ((PlacableFixed) placable).rotSet(r.readInt());
-            } else if (cls.equals(PRINT)) {
+            } else if (kind == ST_PRINT) {
                 Object placer = field(placable, "this$0");
                 Class<?> printC = Class.forName("settlement.room.main.copy.SavedPrints$SavedPrint");
                 Object print = allocate(printC);
@@ -550,8 +613,21 @@ public final class RoomToolSync {
                 TBuilding b = building(r.readInt());
                 if (b != null)
                     SETT.ROOMS().placement.placer.structure.set(b);
-                ((PlacableFixed) placable).rotSet(r.readInt());
+            } else if (kind == ST_ITEM) {
+                // RoomPlacer.item(group) stages the group (and blueprint/upgrade) on the shared item placer
+                // exactly as the issuer's UI did; the placer's blueprint itself arrived with the synced init.
+                int g = r.readInt();
+                settlement.room.main.placement.RoomPlacer placer = SETT.ROOMS().placement.placer;
+                if (g < 0 || placer.blueprint() == null)
+                    throw new IllegalStateException("item placement without a staged blueprint/group (" + g + ")");
+                Object staged = placer.item(g);
+                if (staged != placable)
+                    throw new IllegalStateException("item placer mismatch: " + staged.getClass().getName()
+                            + " staged for " + cls);
             }
+            // Last: PlacerItemSingle.set() restores a remembered size per blueprint (PlacerItemSingle.java:97).
+            fixed.rotSet(rot);
+            fixed.sizeSet(size);
         } catch (Exception e) {
             throw new IllegalStateException("cannot apply tool state of " + cls, e);
         }

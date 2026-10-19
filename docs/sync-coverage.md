@@ -119,7 +119,11 @@ AIModule_Prisoner, DIP, ROPINION, RD, EVENTS, NOBLES; depth 12).
    bit set / entity cursor (`ToolSync.HOOKED_TOOLS` keeps them off the TOOL
    path). Refurnish: `UIRoomPlacer.init(RoomInstanceImp)` hook → REFURNISH
    (room removal + `RoomPlacer.reconstruct` on every client; the tool opens
-   on the issuer when the command executes).
+   on the issuer when the command executes). Session 5: every FIXED command
+   carries rotation/size and, for the shared item placers, the item group;
+   placer stats are recomputed before each placer verb; the wall material
+   travels with staging/refurnish; `RoomPlacer.init` runs locally at once as
+   well (`AutoSync.stagePlacer`) — see `HANDOFF5.md`.
 7. ~~Hospital `fetch[]`, `RBITImp.or(RBIT.ALL)`, move-order slots~~ —
    synced: `hospital/Gui$1.clickA` hook → HOSPITAL_FETCH; `MoveOrderPullUI`
    auto-assign ($1), source placer (`$Placer.placeFirst`), remove
@@ -131,8 +135,11 @@ AIModule_Prisoner, DIP, ROPINION, RD, EVENTS, NOBLES; depth 12).
 
 - `RDBuilding` read the local building popup's draft levels
   (`RDLevelsTmp.level`) → redirected to the real level in MP (`Determinism.rdLevel`).
-- `UIDipMessDeal.pactive()` rewrites `DIP.TMP()` during render on one client;
-  the sim resets it before use — watch desync reports pointing at diplomacy.
+- `UIDipMessDeal.pactive()` rewrites `DIP.TMP()` during render on every
+  client that has the proposal open, and those IntImp writes went out as
+  commands (185k in minutes). Session 5: `DIP#s.dealTmp.*` is local-only
+  (`AutoSync.LOCAL_TARGETS`); accept/decline are DEAL_ACCEPT/DEAL_DECLINE
+  commands that also close every client's copy of the message.
 - `GAME.SPEED.tmpPause()` from several popups is suppressed in MP (already).
 - The raid demand message (`MessDemand`): session 3's `tributePay` redirect
   never linked (`NoSuchMethodError`: the replacement took `Object`, the

@@ -36,13 +36,14 @@ public final class DevAuto {
     private static int areaAtFrame = -1;
     private static int stockpileStep;
 
-    /** -Dsyxmp.autorefurnish=<room index|-1>: the client with -Dsyxmp.autorefurnish.role (host|joiner, default
+    /** -Dsyxmp.autorefurnish=<room index|-1 first area room|-2 first indoor area room>: the client with -Dsyxmp.autorefurnish.role (host|joiner, default
      *  joiner) refurnishes that room through the room panel's button path (UIRoomPlacer.reconstruct) once both
      *  players are in lockstep, then "constructs" it 100 frames later exactly like SFrame's OK button. */
     private static final String AUTOREFURNISH = System.getProperty("syxmp.autorefurnish");
     private static final String AUTOREFURNISH_ROLE = System.getProperty("syxmp.autorefurnish.role", "joiner");
     private static int refurnishFrames;
     private static int refurnishStep;
+    private static int rfX1, rfY1, rfX2, rfY2;
 
     private static int menuFrames;
     private static int gameFrames;
@@ -216,33 +217,74 @@ public final class DevAuto {
             framesWithTwo = 0;
         }
 
-        if (AUTOREFURNISH != null && refurnishStep < 2 && Multiplayer.active() && TickController.inLockstep()
+        if (AUTOREFURNISH != null && refurnishStep < 3 && Multiplayer.active() && TickController.inLockstep()
+                && TickController.simulatingTarget < 0 && !Multiplayer.reloading
                 && Multiplayer.session.players.size() >= 2
                 && Multiplayer.session.isHost == "host".equals(AUTOREFURNISH_ROLE)) {
             refurnishFrames++;
-            if (refurnishStep == 0 && refurnishFrames >= 150) {
+            if (refurnishStep == 0 && refurnishFrames >= 60) {
                 refurnishStep = 1;
                 int want = Integer.parseInt(AUTOREFURNISH);
                 settlement.room.main.RoomInstance room = null;
+                int seen = 0, maxI = -1;
                 outer:
                 for (settlement.room.main.RoomBlueprintIns<?> b : settlement.main.SETT.ROOMS().ins())
                     for (int k = 0; k < b.instancesSize(); k++) {
                         settlement.room.main.RoomInstance r = b.getInstance(k);
-                        if (r.index() == want || (want < 0 && r.constructor() != null && r.constructor().usesArea())) {
+                        seen++;
+                        maxI = Math.max(maxI, r.index());
+                        boolean area = r.constructor() != null && r.constructor().usesArea();
+                        if (r.index() == want || (want == -1 && area)
+                                || (want == -2 && area && r.constructor().mustBeIndoors())) {
                             room = r;
                             break outer;
                         }
                     }
+                if (room == null && want >= 0 && settlement.main.SETT.ROOMS().map.getByIndex(want) instanceof settlement.room.main.RoomInstance ri)
+                    room = ri;
                 if (room == null) {
-                    MpLog.info("[auto] no room to refurnish (" + want + ")");
-                    refurnishStep = 2;
+                    MpLog.info("[auto] no room to refurnish (" + want + "): " + seen + " instances, max index " + maxI
+                            + ", map slot " + settlement.main.SETT.ROOMS().map.getByIndex(want));
+                    refurnishStep = 3;
                     return;
                 }
+                rfX1 = room.body().x1(); rfY1 = room.body().y1(); rfX2 = room.body().x2(); rfY2 = room.body().y2();
                 MpLog.info("[auto] action: refurnish room #" + room.index() + " (" + room.blueprint().key + ") at "
-                        + room.mX() + "," + room.mY() + " area " + room.area());
+                        + room.mX() + "," + room.mY() + " area " + room.area() + " body " + rfX1 + "," + rfY1 + "-" + rfX2 + "," + rfY2);
                 view.main.VIEW.s().ui.placer.reconstruct(room);
-            } else if (refurnishStep == 1 && refurnishFrames >= 250) {
+            } else if (refurnishStep == 1 && refurnishFrames >= 120) {
                 refurnishStep = 2;
+                // Furnish like a player would: clear the items, pick an item group, rotate/size it in the
+                // tool (UI-local state on the shared placer), place it through the tool hook.
+                settlement.room.main.placement.RoomPlacer placer = settlement.main.SETT.ROOMS().placement.placer;
+                placer.removeAllItems();
+                settlement.room.main.RoomBlueprintImp blue = placer.blueprint();
+                int g = 0;
+                for (int k = 0; k < blue.constructor().pgroups().size(); k++) {
+                    view.tool.PlacableFixed t = placer.item(k);
+                    if (t.rotations() > 1 || t.sizes() > 1) {
+                        g = k;
+                        break;
+                    }
+                }
+                view.tool.PlacableFixed pp = placer.item(g);
+                pp.rotSet(1);
+                pp.sizeSet(pp.sizes() - 1);
+                MpLog.info("[auto] action: furnish group " + g + " rot " + pp.rot() + "/" + pp.rotations() + " size "
+                        + pp.size() + "/" + pp.sizes() + " " + pp.width() + "x" + pp.height());
+                boolean placed = false;
+                for (int y = rfY1; y < rfY2 && !placed; y++)
+                    for (int x = rfX1; x < rfX2 && !placed; x++) {
+                        if (pp.placableWhole(x, y) == null) {
+                            MpLog.info("[auto] action: place item at " + x + "," + y);
+                            syxmp.sync.ToolSync.placeFixed(pp, x, y, 0, 0);
+                            placed = true;
+                        }
+                    }
+                if (!placed)
+                    MpLog.info("[auto] no spot for the item");
+            } else if (refurnishStep == 2 && refurnishFrames >= 180) {
+                refurnishStep = 3;
                 settlement.room.main.placement.RoomPlacer placer = settlement.main.SETT.ROOMS().placement.placer;
                 MpLog.info("[auto] action: construct refurnished room; problem=" + placer.createProblem()
                         + " size " + placer.size());
