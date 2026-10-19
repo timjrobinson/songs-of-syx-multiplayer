@@ -60,6 +60,14 @@ format change beyond the FIXED tool state (protocol 10).
    happiness, faction + creation second) that executes the sim part and marks
    + closes every client's copy of the message.
 
+8. **Construction panel showed 0 workers / efficiency / output while paused**
+   and refused to construct. The placer caches (`UtilStats`, `UtilExtraCost`,
+   `PlacerDoor`, `UtilStructure.roofs`) are keyed on `GAME.updateI()`, which
+   vanilla advances every frame even while paused (`GAME.update(0)`) and MP
+   never advances while paused. `RoomToolSync.invalidatePlacerCaches` resets
+   the four tick keys once per rendered frame in MP (same recompute rate as
+   vanilla running); the synced verbs still force-refresh at execution.
+
 ## Verification
 
 - `test.sh` headless suite (all redirect replacements resolve, hooks apply).
