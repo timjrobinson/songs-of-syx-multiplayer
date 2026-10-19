@@ -68,6 +68,15 @@ format change beyond the FIXED tool state (protocol 10).
    the four tick keys once per rendered frame in MP (same recompute rate as
    vanilla running); the synced verbs still force-refresh at execution.
 
+9. **Auto-walls flood with odd parity.** `PlacerItemArea.renderPlaceHolder`
+   brackets its preview with `autoWalls.set(false)` / `set(b)`: two synced
+   commands per hovered frame (1,289 between staging and construct in the
+   second two-PC test, an odd number — the last one was `set(false)`), while
+   the issuer's own calls were cancelled. The host built the hunters' lodge
+   without walls, the joiner with them → desync 6 s after unpausing. The
+   two calls inside `renderPlaceHolder` are redirected to
+   `UiRedirects.autoWallsLocal` (local only); the toggle button stays synced.
+
 ## Verification
 
 - `test.sh` headless suite (all redirect replacements resolve, hooks apply).
